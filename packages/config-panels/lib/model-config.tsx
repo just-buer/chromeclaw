@@ -69,6 +69,8 @@ const emptyForm: ModelFormData = {
   supportsTools: false,
   supportsReasoning: false,
   api: undefined,
+  toolTimeoutSeconds: undefined,
+  contextWindow: undefined,
 };
 
 const apiOptions = [

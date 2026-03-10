@@ -1,0 +1,1137 @@
+{
+  "extensionDescription": {
+    "description": "Extension description",
+    "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. Jedes OS. Jede Plattform. 🦞"
+  },
+  "extensionName": {
+    "description": "Extension name",
+    "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. 🦞"
+  },
+  "displayErrorInfo": {
+    "message": "Fehler aufgetreten"
+  },
+  "displayErrorDescription": {
+    "message": "Entschuldigung, beim Laden der Seite ist ein Fehler aufgetreten."
+  },
+  "displayErrorDetailsInfo": {
+    "message": "Fehlerdetails:"
+  },
+  "displayErrorUnknownErrorInfo": {
+    "message": "Unbekannter Fehler"
+  },
+  "displayErrorReset": {
+    "message": "Erneut ausführen"
+  },
+  "firstRun_welcome": {
+    "message": "Willkommen bei ChromeClaw"
+  },
+  "firstRun_addApiKey": {
+    "message": "Füge deinen API-Schlüssel hinzu, um zu chatten"
+  },
+  "firstRun_apiKeyRequired": {
+    "message": "API-Schlüssel erforderlich (oder Base-URL für Proxys ohne Authentifizierung angeben)"
+  },
+  "firstRun_modelIdRequired": {
+    "message": "Modell-ID erforderlich"
+  },
+  "firstRun_saveFailed": {
+    "message": "Modell konnte nicht gespeichert werden"
+  },
+  "firstRun_provider": {
+    "message": "Anbieter"
+  },
+  "firstRun_apiKey": {
+    "message": "API-Schlüssel"
+  },
+  "firstRun_apiKeyOptional": {
+    "message": "API-Schlüssel (optional für Proxys)"
+  },
+  "firstRun_modelId": {
+    "message": "Modell-ID"
+  },
+  "firstRun_baseUrl": {
+    "message": "Base-URL (optional)"
+  },
+  "firstRun_baseUrlHint": {
+    "message": "Für OpenAI-kompatible Proxys (ollama, copilot-api usw.)"
+  },
+  "firstRun_startChatting": {
+    "message": "Chat starten"
+  },
+  "firstRun_advancedSetup": {
+    "message": "Erweiterte Einrichtung"
+  },
+  "chat_placeholder": {
+    "message": "Was möchtest du wissen?"
+  },
+  "chat_modelSelect": {
+    "message": "Modell"
+  },
+  "chat_fileSizeError": {
+    "message": "Datei \u201E$FILE_NAME$\u201C \u00FCberschreitet das 10-MB-Limit.",
+    "placeholders": {
+      "file_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "chat_fileReadError": {
+    "message": "\u201E$FILE_NAME$\u201C konnte nicht gelesen werden.",
+    "placeholders": {
+      "file_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "chat_maxFilesError": {
+    "message": "Maximal $MAX_FILES$ Dateien erlaubt.",
+    "placeholders": {
+      "max_files": {
+        "content": "$1"
+      }
+    }
+  },
+  "session_newSession": {
+    "message": "Neue Sitzung"
+  },
+  "session_rename": {
+    "message": "Umbenennen"
+  },
+  "session_delete": {
+    "message": "Löschen"
+  },
+  "session_searchPlaceholder": {
+    "message": "Chats durchsuchen..."
+  },
+  "session_noMatching": {
+    "message": "Keine passenden Sitzungen"
+  },
+  "session_noSessions": {
+    "message": "Noch keine Sitzungen"
+  },
+  "session_today": {
+    "message": "Heute"
+  },
+  "session_yesterday": {
+    "message": "Gestern"
+  },
+  "session_last7Days": {
+    "message": "Letzte 7 Tage"
+  },
+  "session_last30Days": {
+    "message": "Letzte 30 Tage"
+  },
+  "session_older": {
+    "message": "Älter"
+  },
+  "session_deleteTitle": {
+    "message": "Sitzung löschen"
+  },
+  "session_deleteDescription": {
+    "message": "Diese Sitzung und alle zugehörigen Nachrichten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "session_deleteAllTitle": {
+    "message": "Alle Sitzungen löschen?"
+  },
+  "session_deleteAllDescription": {
+    "message": "Alle Sitzungen, Nachrichten und Artefakte werden dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden."
+  },
+  "common_cancel": {
+    "message": "Abbrechen"
+  },
+  "common_delete": {
+    "message": "Löschen"
+  },
+  "common_deleteAll": {
+    "message": "Alle löschen"
+  },
+  "common_save": {
+    "message": "Speichern"
+  },
+  "common_saved": {
+    "message": "Gespeichert"
+  },
+  "common_confirm": {
+    "message": "Bestätigen"
+  },
+  "common_ok": {
+    "message": "OK"
+  },
+  "common_loading": {
+    "message": "Laden..."
+  },
+  "common_error": {
+    "message": "Fehler"
+  },
+  "common_on": {
+    "message": "EIN"
+  },
+  "common_off": {
+    "message": "AUS"
+  },
+  "common_enabled": {
+    "message": "Aktiviert"
+  },
+  "common_disabled": {
+    "message": "Deaktiviert"
+  },
+  "toolbar_elementary": {
+    "message": "Grundschule"
+  },
+  "toolbar_middleSchool": {
+    "message": "Mittelstufe"
+  },
+  "toolbar_keepLevel": {
+    "message": "Aktuelles Niveau beibehalten"
+  },
+  "toolbar_highSchool": {
+    "message": "Oberstufe"
+  },
+  "toolbar_college": {
+    "message": "Universität"
+  },
+  "toolbar_graduate": {
+    "message": "Postgraduiert"
+  },
+  "toolbar_adjustReading": {
+    "message": "Bitte das Leseniveau auf $LEVEL$ anpassen.",
+    "placeholders": {
+      "level": {
+        "content": "$1"
+      }
+    }
+  },
+  "slash_notEnoughMessages": {
+    "message": "Nicht genügend Nachrichten zum Komprimieren"
+  },
+  "slash_compacting": {
+    "message": "Konversation wird komprimiert..."
+  },
+  "slash_noResponse": {
+    "message": "Keine Antwort vom Hintergrund (Service Worker wurde möglicherweise neu gestartet)"
+  },
+  "slash_conversationSummary": {
+    "message": "[Gesprächszusammenfassung]"
+  },
+  "slash_earlierCompacted": {
+    "message": "[Frühere Nachrichten komprimiert]"
+  },
+  "slash_compactSuccess": {
+    "message": "Konversation komprimiert"
+  },
+  "slash_compactFailed": {
+    "message": "Komprimierung fehlgeschlagen"
+  },
+  "slash_conversationCleared": {
+    "message": "Konversation gelöscht"
+  },
+  "slash_availableCommands": {
+    "message": "Verfügbare Befehle:"
+  },
+  "toast_offline": {
+    "message": "Du bist offline. Überprüfe deine Netzwerkverbindung."
+  },
+  "toast_online": {
+    "message": "Wieder online."
+  },
+  "toast_allSessionsCleared": {
+    "message": "Alle Sitzungen gelöscht"
+  },
+  "toast_subagentFinished": {
+    "message": "Subagent abgeschlossen: $TASK$",
+    "placeholders": {
+      "task": {
+        "content": "$1"
+      }
+    }
+  },
+  "toast_scheduledTask": {
+    "message": "Geplant: $TASK$",
+    "placeholders": {
+      "task": {
+        "content": "$1"
+      }
+    }
+  },
+  "toast_scheduledTaskFired": {
+    "message": "Geplante Aufgabe ausgeführt"
+  },
+  "toast_newTelegramMessage": {
+    "message": "Neue Telegram-Nachricht"
+  },
+  "toast_view": {
+    "message": "Anzeigen"
+  },
+  "settings_title": {
+    "message": "Einstellungen"
+  },
+  "settings_description": {
+    "message": "Darstellung und Einstellungen konfigurieren"
+  },
+  "settings_appearance": {
+    "message": "Darstellung"
+  },
+  "settings_theme": {
+    "message": "Design"
+  },
+  "settings_themeSystem": {
+    "message": "System"
+  },
+  "settings_themeLight": {
+    "message": "Hell"
+  },
+  "settings_themeDark": {
+    "message": "Dunkel"
+  },
+  "settings_language": {
+    "message": "Sprache"
+  },
+  "settings_languageAuto": {
+    "message": "Automatisch (Browser-Standard)"
+  },
+  "model_title": {
+    "message": "Modellkonfiguration"
+  },
+  "model_description": {
+    "message": "KI-Modelle für den Chat verwalten"
+  },
+  "model_customModels": {
+    "message": "Benutzerdefinierte Modelle"
+  },
+  "model_addModel": {
+    "message": "Modell hinzufügen"
+  },
+  "model_editModel": {
+    "message": "Modell bearbeiten"
+  },
+  "model_noModels": {
+    "message": "Keine benutzerdefinierten Modelle konfiguriert. Füge ein Modell hinzu, um loszulegen."
+  },
+  "model_downloadModel": {
+    "message": "Modell herunterladen"
+  },
+  "model_deleteCachedModel": {
+    "message": "Zwischengespeichertes Modell löschen"
+  },
+  "model_deleteModel": {
+    "message": "Modell löschen?"
+  },
+  "model_deleteCache": {
+    "message": "Zwischengespeichertes Modell löschen?"
+  },
+  "model_downloaded": {
+    "message": "Heruntergeladen"
+  },
+  "model_notDownloaded": {
+    "message": "Nicht heruntergeladen"
+  },
+  "model_localDescription": {
+    "message": "Ein lokales Modell auf dem Gerät konfigurieren. Kein API-Schlüssel erforderlich."
+  },
+  "model_remoteDescription": {
+    "message": "Modellanbieter und Verbindungsdetails konfigurieren."
+  },
+  "model_name": {
+    "message": "Name"
+  },
+  "model_apiFormat": {
+    "message": "API-Format"
+  },
+  "model_autoDetect": {
+    "message": "Automatische Erkennung"
+  },
+  "model_chatCompletions": {
+    "message": "Chat Completions (/v1/chat/completions)"
+  },
+  "model_responses": {
+    "message": "Responses (/v1/responses)"
+  },
+  "model_codexResponses": {
+    "message": "Codex Responses (/v1/responses)"
+  },
+  "model_descriptionOptional": {
+    "message": "Beschreibung (optional)"
+  },
+  "model_supportsTools": {
+    "message": "Unterstützt Tools"
+  },
+  "model_supportsReasoning": {
+    "message": "Unterstützt Reasoning"
+  },
+  "model_toolTimeout": {
+    "message": "Tool-Timeout (Sekunden)"
+  },
+  "model_toolTimeoutHint": {
+    "message": "Maximale Zeit für Tool-Ausführung bevor gestoppt wird (Standard: 600s / 10 Min)"
+  },
+  "model_contextWindow": {
+    "message": "Kontextfenster (Token)"
+  },
+  "model_contextWindowPlaceholder": {
+    "message": "Automatisch anhand der Modell-ID erkennen"
+  },
+  "model_contextWindowHint": {
+    "message": "Kontextfenstergröße für Komprimierung überschreiben. Leer lassen für automatische Erkennung."
+  },
+  "model_downloading": {
+    "message": "Modell wird heruntergeladen..."
+  },
+  "model_downloadComplete": {
+    "message": "Download abgeschlossen"
+  },
+  "model_downloadFailed": {
+    "message": "Download fehlgeschlagen"
+  },
+  "model_testConnection": {
+    "message": "Verbindung testen"
+  },
+  "model_connectionFailed": {
+    "message": "Verbindung fehlgeschlagen"
+  },
+  "model_baseUrlNeeded": {
+    "message": "Base-URL für Verbindungstest erforderlich"
+  },
+  "model_nameRequired": {
+    "message": "Name ist erforderlich"
+  },
+  "model_providerRequired": {
+    "message": "Anbieter ist erforderlich"
+  },
+  "model_baseUrlInvalid": {
+    "message": "Base-URL muss mit http:// oder https:// beginnen"
+  },
+  "model_huggingFaceModelId": {
+    "message": "HuggingFace-Modell-ID"
+  },
+  "skill_title": {
+    "message": "Skills"
+  },
+  "skill_description": {
+    "message": "Skills bieten aufgabenspezifische Anleitungen, die das LLM bei Bedarf über das Lese-Tool abrufen kann."
+  },
+  "skill_browserWarning": {
+    "message": "Skills werden in der Chrome-Browserumgebung ausgeführt — CLI-Tools, Python-Skripte und andere lokale Programme werden nicht unterstützt."
+  },
+  "skill_installedSkills": {
+    "message": "Installierte Skills"
+  },
+  "skill_importZip": {
+    "message": "ZIP importieren"
+  },
+  "skill_newSkill": {
+    "message": "Neuer Skill"
+  },
+  "skill_loadingSkills": {
+    "message": "Skills werden geladen…"
+  },
+  "skill_noSkills": {
+    "message": "Keine Skills installiert"
+  },
+  "skill_deleted": {
+    "message": "Skill gelöscht"
+  },
+  "skill_importExists": {
+    "message": "Ein Skill existiert bereits unter $PATH$. Lösche ihn zuerst oder benenne den Import um.",
+    "placeholders": {
+      "path": {
+        "content": "$1"
+      }
+    }
+  },
+  "skill_importedSkill": {
+    "message": "Skill importiert: $SKILL_NAME$",
+    "placeholders": {
+      "skill_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "skill_importFailed": {
+    "message": "Skill konnte nicht importiert werden"
+  },
+  "skill_deleteConfirm": {
+    "message": "Skill \u201E$SKILL_NAME$\u201C l\u00F6schen? Dies kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+    "placeholders": {
+      "skill_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "sessionMgr_title": {
+    "message": "Sitzungen"
+  },
+  "sessionMgr_searchPlaceholder": {
+    "message": "Sitzungen durchsuchen..."
+  },
+  "sessionMgr_noMatching": {
+    "message": "Keine passenden Sitzungen."
+  },
+  "sessionMgr_noSessions": {
+    "message": "Noch keine Sitzungen."
+  },
+  "sessionMgr_clickToSelect": {
+    "message": "Klicken zum Auswählen, Doppelklick zum Öffnen"
+  },
+  "sessionMgr_clickToSelectSidePanel": {
+    "message": "Klicken zum Auswählen, Doppelklick zum Öffnen im Seitenpanel"
+  },
+  "telegram_title": {
+    "message": "Telegram-Bot"
+  },
+  "telegram_description": {
+    "message": "Verbinde einen Telegram-Bot, um mit deinem KI-Assistenten über Telegram zu chatten."
+  },
+  "telegram_enableBot": {
+    "message": "Telegram-Bot aktivieren"
+  },
+  "telegram_botToken": {
+    "message": "Bot-Token"
+  },
+  "telegram_validate": {
+    "message": "Validieren"
+  },
+  "telegram_tokenValid": {
+    "message": "Token gültig"
+  },
+  "telegram_invalidToken": {
+    "message": "Ungültiges Token"
+  },
+  "telegram_allowedUserIds": {
+    "message": "Erlaubte Benutzer-IDs"
+  },
+  "telegram_userIdsHint": {
+    "message": "Nur Nachrichten von diesen Telegram-Benutzer-IDs werden verarbeitet. Erhalte deine ID von @userinfobot. Muss numerisch sein."
+  },
+  "telegram_noUsers": {
+    "message": "Noch keine Benutzer erlaubt. Füge mindestens eine Benutzer-ID hinzu, um Nachrichten zu empfangen."
+  },
+  "telegram_loadFailed": {
+    "message": "Konfiguration konnte nicht geladen werden"
+  },
+  "telegram_validationFailed": {
+    "message": "Validierung fehlgeschlagen"
+  },
+  "telegram_saveFailed": {
+    "message": "Speichern fehlgeschlagen"
+  },
+  "telegram_toggleFailed": {
+    "message": "Umschalten fehlgeschlagen"
+  },
+  "agents_newAgent": {
+    "message": "Neuer Agent"
+  },
+  "agents_mainAgent": {
+    "message": "Haupt-Agent"
+  },
+  "agents_deleteAgent": {
+    "message": "Agent löschen"
+  },
+  "agents_deleteAgentConfirm": {
+    "message": "Diesen Agenten und alle zugehörigen Daten löschen? Dies kann nicht rückgängig gemacht werden."
+  },
+  "agents_overview": {
+    "message": "Übersicht"
+  },
+  "agents_files": {
+    "message": "Dateien"
+  },
+  "agents_tools": {
+    "message": "Tools"
+  },
+  "agents_skills": {
+    "message": "Skills"
+  },
+  "agents_workspaceFiles": {
+    "message": "Arbeitsbereich-Dateien"
+  },
+  "agents_agentCreated": {
+    "message": "Agent erstellt"
+  },
+  "agents_agentDeleted": {
+    "message": "Agent gelöscht"
+  },
+  "agents_deleteAgentFailed": {
+    "message": "Agent konnte nicht gelöscht werden"
+  },
+  "agents_fileDeleted": {
+    "message": "Datei gelöscht"
+  },
+  "agents_fileUploaded": {
+    "message": "Datei hochgeladen"
+  },
+  "agents_fileRenamed": {
+    "message": "Datei umbenannt"
+  },
+  "agents_cannotRenamePredefined": {
+    "message": "Ordner mit vordefinierten Dateien kann nicht umbenannt werden"
+  },
+  "agents_cannotDeletePredefined": {
+    "message": "Ordner mit vordefinierten Dateien kann nicht gelöscht werden"
+  },
+  "agents_folderRenamed": {
+    "message": "Ordner umbenannt"
+  },
+  "agents_folderDeleted": {
+    "message": "Ordner gelöscht"
+  },
+  "agents_folderEmpty": {
+    "message": "Ordner ist leer"
+  },
+  "agents_fileSaved": {
+    "message": "Datei gespeichert"
+  },
+  "agents_identity": {
+    "message": "Identität"
+  },
+  "agents_identityHint": {
+    "message": "Bearbeite diese Werte in der Datei IDENTITY.md unter dem Reiter Dateien."
+  },
+  "agents_notSet": {
+    "message": "(nicht gesetzt)"
+  },
+  "agents_justNow": {
+    "message": "gerade eben"
+  },
+  "agents_minutesAgo": {
+    "message": "vor $MINUTES$ Min.",
+    "placeholders": {
+      "minutes": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_hoursAgo": {
+    "message": "vor $HOURS$ Std.",
+    "placeholders": {
+      "hours": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_daysAgo": {
+    "message": "vor $DAYS$ T.",
+    "placeholders": {
+      "days": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_monthsAgo": {
+    "message": "vor $MONTHS$ Mon.",
+    "placeholders": {
+      "months": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_deleteFile": {
+    "message": "Datei löschen"
+  },
+  "agents_deleteFileConfirm": {
+    "message": "\u201E$FILE_NAME$\u201C l\u00F6schen? Dies kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+    "placeholders": {
+      "file_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_deleteFolder": {
+    "message": "Ordner löschen"
+  },
+  "agents_deleteFolderConfirm": {
+    "message": "Ordner \u201E$FOLDER_NAME$\u201C und alle $FILE_COUNT$ Datei(en) darin l\u00F6schen? Dies kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+    "placeholders": {
+      "folder_name": {
+        "content": "$1"
+      },
+      "file_count": {
+        "content": "$2"
+      }
+    }
+  },
+  "agents_renameFile": {
+    "message": "Datei umbenennen"
+  },
+  "agents_renameFolder": {
+    "message": "Ordner umbenennen"
+  },
+  "agents_newFile": {
+    "message": "Neue Datei"
+  },
+  "agents_newFolder": {
+    "message": "Neuer Ordner"
+  },
+  "agents_newFolderName": {
+    "message": "Neuer Ordnername"
+  },
+  "agents_upload": {
+    "message": "Hochladen"
+  },
+  "agents_edit": {
+    "message": "Bearbeiten"
+  },
+  "agents_download": {
+    "message": "Herunterladen"
+  },
+  "agents_downloadFolderZip": {
+    "message": "Ordner als ZIP herunterladen"
+  },
+  "agents_refresh": {
+    "message": "Aktualisieren"
+  },
+  "agents_importZip": {
+    "message": "ZIP importieren"
+  },
+  "optionsPage_title": {
+    "message": "ChromeClaw-Einstellungen"
+  },
+  "provider_openai": {
+    "message": "OpenAI"
+  },
+  "provider_anthropic": {
+    "message": "Anthropic"
+  },
+  "provider_google": {
+    "message": "Google"
+  },
+  "provider_openrouter": {
+    "message": "OpenRouter"
+  },
+  "provider_openaiCompatible": {
+    "message": "OpenAI-kompatibel"
+  },
+  "provider_webgpu": {
+    "message": "WebGPU (lokal)"
+  },
+  "time_mAgo": {
+    "message": "vor $MINUTES$ Min.",
+    "placeholders": {
+      "minutes": {
+        "content": "$1"
+      }
+    }
+  },
+  "time_hAgo": {
+    "message": "vor $HOURS$ Std.",
+    "placeholders": {
+      "hours": {
+        "content": "$1"
+      }
+    }
+  },
+  "time_dAgo": {
+    "message": "vor $DAYS$ T.",
+    "placeholders": {
+      "days": {
+        "content": "$1"
+      }
+    }
+  },
+  "tabGroup_control": {
+    "message": "Steuerung"
+  },
+  "tabGroup_agent": {
+    "message": "Agent"
+  },
+  "tabGroup_settings": {
+    "message": "Einstellungen"
+  },
+  "tab_channels": {
+    "message": "Kanäle"
+  },
+  "tab_cronJobs": {
+    "message": "Cron-Jobs"
+  },
+  "tab_sessions": {
+    "message": "Sitzungen"
+  },
+  "tab_usage": {
+    "message": "Nutzung"
+  },
+  "tab_agents": {
+    "message": "Agenten"
+  },
+  "tab_tools": {
+    "message": "Tools"
+  },
+  "tab_skills": {
+    "message": "Skills"
+  },
+  "tab_general": {
+    "message": "Allgemein"
+  },
+  "tab_models": {
+    "message": "Modelle"
+  },
+  "tab_actions": {
+    "message": "Aktionen"
+  },
+  "tab_logs": {
+    "message": "Protokolle"
+  },
+  "whatsapp_title": {
+    "message": "WhatsApp"
+  },
+  "whatsapp_description": {
+    "message": "Verbinde WhatsApp, um mit deinem KI-Assistenten vom Handy aus zu chatten. Verwendet das WhatsApp-Web-Protokoll — kein externer Server erforderlich."
+  },
+  "whatsapp_connection": {
+    "message": "Verbindung"
+  },
+  "whatsapp_connect": {
+    "message": "Verbinden"
+  },
+  "whatsapp_disconnect": {
+    "message": "Trennen"
+  },
+  "whatsapp_disconnected": {
+    "message": "Getrennt"
+  },
+  "whatsapp_connecting": {
+    "message": "Warte auf QR-Scan..."
+  },
+  "whatsapp_connected": {
+    "message": "Verbunden"
+  },
+  "whatsapp_reconnecting": {
+    "message": "Verbindung wird wiederhergestellt..."
+  },
+  "whatsapp_loggedOut": {
+    "message": "Abgemeldet"
+  },
+  "whatsapp_scanQr": {
+    "message": "Mit WhatsApp scannen"
+  },
+  "whatsapp_scanInstructions": {
+    "message": "Öffne WhatsApp auf deinem Handy → Einstellungen → Verknüpfte Geräte → Gerät verknüpfen"
+  },
+  "whatsapp_connectedMsg": {
+    "message": "WhatsApp verbunden und empfängt Nachrichten"
+  },
+  "whatsapp_reconnectingMsg": {
+    "message": "Verbindung zu WhatsApp wird wiederhergestellt..."
+  },
+  "whatsapp_allowedNumbers": {
+    "message": "Erlaubte Telefonnummern"
+  },
+  "whatsapp_numbersHint": {
+    "message": "Nur Nachrichten von diesen Telefonnummern werden verarbeitet. Nummern mit Ländervorwahl eingeben (z. B. +491234567890)."
+  },
+  "whatsapp_noNumbers": {
+    "message": "Noch keine Nummern erlaubt. Füge mindestens eine Telefonnummer hinzu, um Nachrichten zu empfangen."
+  },
+  "whatsapp_messageDirection": {
+    "message": "Nachrichtenrichtung"
+  },
+  "whatsapp_directionHint": {
+    "message": "Steuere, welche Nachrichten vom KI-Assistenten verarbeitet werden."
+  },
+  "whatsapp_processMyMessages": {
+    "message": "Eigene Nachrichten verarbeiten"
+  },
+  "whatsapp_processOthers": {
+    "message": "Nachrichten von anderen verarbeiten"
+  },
+  "whatsapp_connectionFailed": {
+    "message": "Verbindung fehlgeschlagen"
+  },
+  "whatsapp_disconnectFailed": {
+    "message": "Trennen fehlgeschlagen"
+  },
+  "whatsapp_saveFailed": {
+    "message": "Speichern fehlgeschlagen"
+  },
+  "whatsapp_loadFailed": {
+    "message": "Konfiguration konnte nicht geladen werden"
+  },
+  "cron_title": {
+    "message": "Cron-Jobs"
+  },
+  "cron_description": {
+    "message": "Automatisierte Aufgaben des KI-Agenten verwalten"
+  },
+  "cron_active": {
+    "message": "Aktiv"
+  },
+  "cron_stopped": {
+    "message": "Gestoppt"
+  },
+  "cron_noJobs": {
+    "message": "Noch keine Cron-Jobs. Bitte die KI, eine Aufgabe für dich zu planen."
+  },
+  "cron_runHistory": {
+    "message": "Ausführungsverlauf"
+  },
+  "cron_noRuns": {
+    "message": "Noch keine Ausführungen"
+  },
+  "cron_next": {
+    "message": "Nächste: $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "cron_last": {
+    "message": "Letzte: $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "cron_duration": {
+    "message": "Dauer: $DURATION$",
+    "placeholders": {
+      "duration": {
+        "content": "$1"
+      }
+    }
+  },
+  "cron_onceAt": {
+    "message": "Einmalig um $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "cron_every": {
+    "message": "Alle $INTERVAL$",
+    "placeholders": {
+      "interval": {
+        "content": "$1"
+      }
+    }
+  },
+  "usage_title": {
+    "message": "Nutzung"
+  },
+  "usage_description": {
+    "message": "Token-Nutzung über alle Sitzungen"
+  },
+  "usage_sessions": {
+    "message": "Sitzungen"
+  },
+  "usage_totalTokens": {
+    "message": "Gesamte Token"
+  },
+  "usage_input": {
+    "message": "Eingabe"
+  },
+  "usage_output": {
+    "message": "Ausgabe"
+  },
+  "usage_average": {
+    "message": "Durchschnitt: $COUNT$ Token/Sitzung",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "usage_sessionsByUsage": {
+    "message": "Sitzungen nach Nutzung"
+  },
+  "usage_compacted": {
+    "message": "$COUNT$x komprimiert",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "usage_moreSessionsCount": {
+    "message": "...und $COUNT$ weitere Sitzungen",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "actions_title": {
+    "message": "Vorgeschlagene Aktionen"
+  },
+  "actions_description": {
+    "message": "Startvorschläge auf dem leeren Chat-Bildschirm anpassen (max. $MAX$)",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "actions_heading": {
+    "message": "Aktionen"
+  },
+  "actions_resetDefaults": {
+    "message": "Standardwerte wiederherstellen"
+  },
+  "actions_addAction": {
+    "message": "Aktion hinzufügen"
+  },
+  "actions_noActions": {
+    "message": "Keine vorgeschlagenen Aktionen konfiguriert. Füge eine hinzu oder setze auf Standardwerte zurück."
+  },
+  "actions_actionNumber": {
+    "message": "Aktion $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+  "actions_moveUp": {
+    "message": "Nach oben"
+  },
+  "actions_moveDown": {
+    "message": "Nach unten"
+  },
+  "actions_remove": {
+    "message": "Entfernen"
+  },
+  "actions_labelPlaceholder": {
+    "message": "Button-Beschriftung (auf dem Chat-Bildschirm angezeigt)"
+  },
+  "actions_promptPlaceholder": {
+    "message": "Vollständiger Prompt, der beim Klicken an die KI gesendet wird"
+  },
+  "tool_title": {
+    "message": "Tool-Konfiguration"
+  },
+  "tool_description": {
+    "message": "KI-Tools aktivieren oder deaktivieren"
+  },
+  "tool_searchProvider": {
+    "message": "Suchanbieter"
+  },
+  "tool_selectProvider": {
+    "message": "Anbieter auswählen"
+  },
+  "tool_apiKey": {
+    "message": "API-Schlüssel"
+  },
+  "tool_searchEngine": {
+    "message": "Suchmaschine"
+  },
+  "tool_selectEngine": {
+    "message": "Suchmaschine auswählen"
+  },
+  "tool_noApiKey": {
+    "message": "Kein API-Schlüssel nötig — verwendet Browser-Automatisierung"
+  },
+  "tool_subTopics": {
+    "message": "Unterthemen"
+  },
+  "tool_iterationsPerTopic": {
+    "message": "Iterationen pro Thema"
+  },
+  "tool_sourcesPerSearch": {
+    "message": "Quellen pro Suche"
+  },
+  "tool_timeout": {
+    "message": "Timeout (Sekunden)"
+  },
+  "tool_clientId": {
+    "message": "Client-ID"
+  },
+  "tool_connectGoogle": {
+    "message": "Google-Konto verbinden"
+  },
+  "tool_connecting": {
+    "message": "Verbindung wird hergestellt..."
+  },
+  "tool_connectedAs": {
+    "message": "Verbunden als"
+  },
+  "tool_disconnect": {
+    "message": "Trennen"
+  },
+  "tool_failedToConnect": {
+    "message": "Verbindung fehlgeschlagen"
+  },
+  "tool_googleServices": {
+    "message": "Google-Dienste"
+  },
+  "tool_enableGoogleHint": {
+    "message": "Verbinde dein Google-Konto, um diese Tools zu aktivieren"
+  },
+  "tab_chat": {
+    "message": "Chat"
+  },
+  "log_title": {
+    "message": "Protokolle"
+  },
+  "log_description": {
+    "message": "Erweiterungs-Protokolle zur Fehlerbehebung anzeigen. Protokolle werden im Speicher gehalten und beim Neustart der Erweiterung gelöscht."
+  },
+  "log_enableLogging": {
+    "message": "Protokollierung aktivieren"
+  },
+  "log_minLevel": {
+    "message": "Min. Stufe:"
+  },
+  "log_allLevels": {
+    "message": "Alle Stufen"
+  },
+  "log_allCategories": {
+    "message": "Alle Kategorien"
+  },
+  "log_searchPlaceholder": {
+    "message": "Nachrichten durchsuchen..."
+  },
+  "log_live": {
+    "message": "Live"
+  },
+  "log_stop": {
+    "message": "Stopp"
+  },
+  "log_clear": {
+    "message": "Leeren"
+  },
+  "log_noEntries": {
+    "message": "Keine Protokolleinträge"
+  },
+  "log_noMatch": {
+    "message": "Keine Einträge entsprechen den Filtern"
+  },
+  "log_copyEntry": {
+    "message": "Eintrag kopieren"
+  },
+  "log_exportText": {
+    "message": "Text exportieren"
+  },
+  "log_exportJson": {
+    "message": "JSON exportieren"
+  },
+  "log_copyAll": {
+    "message": "Alle kopieren"
+  },
+  "log_copiedCount": {
+    "message": "$COUNT$ Einträge in die Zwischenablage kopiert",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "log_entriesCount": {
+    "message": "$COUNT$ Einträge",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "log_droppedCount": {
+    "message": "$COUNT$ verworfen",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "agents_title": {
+    "message": "Agenten"
+  }
+}
