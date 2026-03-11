@@ -1,8 +1,6 @@
 import {
   extractPdfText,
   toolRegistryMeta,
-  importSkillFromZip,
-  parseSkillFrontmatter,
 } from '@extension/shared';
 import { t, useT } from '@extension/i18n';
 import {
@@ -80,7 +78,6 @@ import {
   UploadIcon,
   UsersIcon,
   WrenchIcon,
-  ZapIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -92,51 +89,13 @@ import type {
   ToolConfig as ToolConfigData,
 } from '@extension/storage';
 import type { FileTreeNode } from '@extension/ui';
-import { SKILL_TEMPLATE, getSkillDisplayName } from './skill-display-utils.js';
-import type { SkillWithMeta } from './skill-display-utils.js';
+import { ConfirmDialog, emptyConfirm } from './confirm-dialog.js';
+import type { ConfirmDialogState } from './confirm-dialog.js';
+import { SkillConfig } from './skill-config.js';
 
 const MAX_CONTENT_LENGTH = 20_000;
 
-// ── Inline dialogs (replacing window.prompt / window.confirm) ──────
-
-type ConfirmDialogState = {
-  open: boolean;
-  title: string;
-  description: string;
-  destructive?: boolean;
-  onConfirm: () => void;
-};
-
-const emptyConfirm: ConfirmDialogState = {
-  open: false,
-  title: '',
-  description: '',
-  onConfirm: () => {},
-};
-
-const ConfirmDialog = ({ state, onClose }: { state: ConfirmDialogState; onClose: () => void }) => (
-  <Dialog open={state.open} onOpenChange={open => !open && onClose()}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>{state.title}</DialogTitle>
-        <DialogDescription>{state.description}</DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <Button onClick={onClose} variant="outline">
-          {t('common_cancel')}
-        </Button>
-        <Button
-          onClick={() => {
-            state.onConfirm();
-            onClose();
-          }}
-          variant={state.destructive ? 'destructive' : 'default'}>
-          {t('common_confirm')}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
+// ── Inline dialogs ──────
 
 type PromptDialogState = {
   open: boolean;
@@ -1104,234 +1063,6 @@ const AgentFilesTab = ({
   );
 };
 
-// ── Agent Skills Tab ─────────────────────────────────
-
-const AgentSkillsTab = ({
-  skillFiles,
-  agentId,
-  onReload,
-}: {
-  skillFiles: DbWorkspaceFile[];
-  agentId: string;
-  onReload: () => void;
-}) => {
-  const t = useT();
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(emptyConfirm);
-  const skillZipInputRef = useRef<HTMLInputElement>(null);
-
-  const skills: SkillWithMeta[] = useMemo(
-    () =>
-      skillFiles.map(file => {
-        const meta = parseSkillFrontmatter(file.content);
-        return {
-          file,
-          displayName: meta?.name ?? getSkillDisplayName(file.name),
-          description: meta?.description ?? '',
-        };
-      }),
-    [skillFiles],
-  );
-
-  const handleToggle = useCallback(
-    async (file: DbWorkspaceFile) => {
-      if (!file.agentId || file.agentId === '') {
-        // Global skill — create an agent-scoped override instead of mutating the shared record
-        await createWorkspaceFile({
-          id: nanoid(),
-          name: file.name,
-          content: file.content,
-          enabled: !file.enabled,
-          owner: file.owner,
-          predefined: file.predefined,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          agentId,
-        });
-      } else {
-        await updateWorkspaceFile(file.id, { enabled: !file.enabled });
-      }
-      onReload();
-    },
-    [agentId, onReload],
-  );
-
-  const handleDelete = useCallback(
-    (file: DbWorkspaceFile) => {
-      const skill = skills.find(s => s.file.id === file.id);
-      const name = skill?.displayName ?? file.name;
-      setConfirmDialog({
-        open: true,
-        title: t('common_delete'),
-        description: t('skill_deleteConfirm', name),
-        destructive: true,
-        onConfirm: async () => {
-          await deleteWorkspaceFile(file.id);
-          onReload();
-          toast.success(t('skill_deleted'));
-        },
-      });
-    },
-    [skills, onReload],
-  );
-
-  const handleNewSkill = useCallback(async () => {
-    const existing = await listWorkspaceFiles(agentId);
-    const existingNames = new Set(existing.map(f => f.name));
-    let skillName = 'untitled';
-    let path = `skills/${skillName}/SKILL.md`;
-    let counter = 2;
-    while (existingNames.has(path)) {
-      skillName = `untitled-${counter}`;
-      path = `skills/${skillName}/SKILL.md`;
-      counter++;
-    }
-    const displayName = skillName
-      .split('-')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-    const template = SKILL_TEMPLATE.replace('name: Untitled', `name: ${displayName}`);
-    const now = Date.now();
-    const file: DbWorkspaceFile = {
-      id: nanoid(),
-      name: path,
-      content: template,
-      enabled: true,
-      owner: 'user',
-      predefined: false,
-      createdAt: now,
-      updatedAt: now,
-      agentId,
-    };
-    await createWorkspaceFile(file);
-    await onReload();
-  }, [agentId, onReload]);
-
-  const handleSkillZipImport = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      e.target.value = '';
-
-      try {
-        const result = await importSkillFromZip(file);
-        const existing = await listWorkspaceFiles(agentId);
-        if (existing.find(f => f.name === result.path)) {
-          toast.error(t('skill_importExists', result.path));
-          return;
-        }
-        const now = Date.now();
-        const wsFile: DbWorkspaceFile = {
-          id: nanoid(),
-          name: result.path,
-          content: result.content,
-          enabled: true,
-          owner: 'user',
-          predefined: false,
-          createdAt: now,
-          updatedAt: now,
-          agentId,
-        };
-        await createWorkspaceFile(wsFile);
-        onReload();
-        toast.success(t('skill_importedSkill', result.name));
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('skill_importFailed'));
-      }
-    },
-    [agentId, onReload],
-  );
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <ScrollArea className="flex-1">
-        <div className="space-y-4 p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <ZapIcon className="size-4 text-amber-500" />
-                {t('skill_title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">{t('skill_installedSkills')}</h3>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => skillZipInputRef.current?.click()}
-                    size="sm"
-                    variant="outline">
-                    <UploadIcon className="mr-1 size-4" /> {t('agents_importZip')}
-                  </Button>
-                  <Button onClick={handleNewSkill} size="sm" variant="outline">
-                    <PlusIcon className="mr-1 size-4" /> {t('skill_newSkill')}
-                  </Button>
-                </div>
-              </div>
-
-              {skills.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('skill_noSkills')}</p>
-              ) : (
-                <div className="divide-y rounded-md border">
-                  {skills.map(({ file, displayName, description }) => (
-                    <div className="flex items-center gap-3 px-3 py-2.5" key={file.id}>
-                      <ZapIcon className="size-4 shrink-0 text-amber-500" />
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={cn(
-                            'text-sm font-medium',
-                            !file.enabled && 'text-muted-foreground line-through',
-                          )}>
-                          {displayName}
-                        </div>
-                        {description && (
-                          <p className="text-muted-foreground truncate text-xs">{description}</p>
-                        )}
-                      </div>
-                      <button
-                        className={cn(
-                          'shrink-0 rounded px-1.5 py-0.5 text-xs font-medium',
-                          file.enabled
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted text-muted-foreground',
-                        )}
-                        onClick={() => handleToggle(file)}
-                        title={file.enabled ? 'Disable' : 'Enable'}
-                        type="button">
-                        {file.enabled ? t('common_on') : t('common_off')}
-                      </button>
-                      <div className="flex shrink-0 gap-1">
-                        {!file.predefined && (
-                          <Button
-                            onClick={() => handleDelete(file)}
-                            size="icon-sm"
-                            variant="ghost"
-                            className="text-muted-foreground hover:text-destructive">
-                            <TrashIcon className="size-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </ScrollArea>
-
-      <input
-        accept=".zip"
-        className="hidden"
-        ref={skillZipInputRef}
-        onChange={handleSkillZipImport}
-        type="file"
-      />
-
-      <ConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog(emptyConfirm)} />
-    </div>
-  );
-};
-
 // ── Agent Tools Tab ──────────────────────────────────
 
 const agentToolIconMap: Record<string, LucideIcon> = {
@@ -1807,7 +1538,7 @@ const AgentsConfig = () => {
           />
 
           {/* Agent detail panel */}
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <AgentDetailHeader
               agent={agentInfo}
               onEmojiChange={handleEmojiChange}
@@ -1893,11 +1624,7 @@ const AgentsConfig = () => {
               <AgentToolsTab agentId={selectedAgentId} onReload={loadAgents} />
             )}
             {activeSubTab === 'skills' && (
-              <AgentSkillsTab
-                skillFiles={skillFiles}
-                agentId={selectedAgentId}
-                onReload={loadFiles}
-              />
+              <SkillConfig agentId={selectedAgentId} onMutate={loadFiles} />
             )}
           </div>
         </div>
