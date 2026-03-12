@@ -1,4 +1,4 @@
-import { DOCUMENTS_ENABLED, DEBUGGER_TOOL_ENABLED } from '@extension/env';
+import { DOCUMENTS_ENABLED } from '@extension/env';
 
 /**
  * Tool registry metadata — shared between background SW and UI.
@@ -463,7 +463,6 @@ Summarize the key points naturally — do not just say "the subagent finished."`
 
 const filteredToolRegistryMeta: readonly ToolGroupMeta[] = toolRegistryMeta.filter(g => {
   if (g.groupKey === 'documents' && !DOCUMENTS_ENABLED) return false;
-  if (g.groupKey === 'debugger' && !DEBUGGER_TOOL_ENABLED) return false;
   return true;
 });
 

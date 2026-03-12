@@ -7,4 +7,3 @@ export const DOCUMENTS_ENABLED = process.env['CEB_ENABLE_DOCUMENTS'] !== 'false'
 export const WHATSAPP_ENABLED = process.env['CEB_ENABLE_WHATSAPP'] !== 'false';
 // Opt-in flags: disabled by default, enabled only if set to 'true'
 export const WEBGPU_MODELS_ENABLED = process.env['CEB_ENABLE_WEBGPU_MODELS'] === 'true';
-export const DEBUGGER_TOOL_ENABLED = process.env['CEB_ENABLE_DEBUGGER_TOOL'] === 'true';

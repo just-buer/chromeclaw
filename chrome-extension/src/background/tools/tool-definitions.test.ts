@@ -927,12 +927,18 @@ describe('executeTool — debugger', () => {
   });
 });
 
-// ── getAgentTools — debugger (feature-flagged) ──
+// ── getAgentTools — debugger ──
 
 describe('getAgentTools — debugger', () => {
-  // DEBUGGER_TOOL_ENABLED defaults to false (no env var), so debugger should not appear
-  it('excludes debugger when feature flag is off (default)', async () => {
+  it('includes debugger when enabled in tool config', async () => {
     currentConfig.enabledTools.debugger = true;
+    const tools = await getAgentTools();
+    const toolNames = tools.map((t: any) => t.name);
+    expect(toolNames).toContain('debugger');
+  });
+
+  it('excludes debugger when disabled in tool config (default)', async () => {
+    currentConfig.enabledTools.debugger = false;
     const tools = await getAgentTools();
     const toolNames = tools.map((t: any) => t.name);
     expect(toolNames).not.toContain('debugger');

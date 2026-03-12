@@ -346,7 +346,6 @@ Set in `.env` (copied from `.example.env` on install):
 | `CEB_ENABLE_DOCUMENTS` | Enable documents tool (`false` by default) |
 | `CEB_ENABLE_WHATSAPP` | Enable WhatsApp channel (`false` by default) |
 | `CEB_ENABLE_WEBGPU_MODELS` | Enable WebGPU local models (`false` by default) |
-| `CEB_ENABLE_DEBUGGER_TOOL` | Enable CDP debugger tool (`false` by default) |
 | `CEB_DEV_LOCALE` | Force locale for development |
 | `CEB_CI` | CI mode flag |
 

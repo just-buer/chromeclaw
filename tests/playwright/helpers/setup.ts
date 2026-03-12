@@ -25,9 +25,22 @@ export const bypassFirstRunSetup = async (page: Page) => {
     .catch(() => false);
 
   if (setupVisible) {
+    // Step 1: Model setup
     await page.locator('[data-testid="setup-api-key"]').fill('sk-test-e2e-000000000000');
     await page.locator('[data-testid="setup-model-id"]').fill('test-model');
     await page.locator('[data-testid="setup-start-button"]').click();
+
+    // Step 2: Channels — skip
+    await page.locator('[data-testid="setup-skip-button"]').first().click();
+
+    // Step 3: Agent — skip
+    await page.locator('[data-testid="setup-skip-button"]').first().click();
+
+    // Step 4: Tools — skip
+    await page.locator('[data-testid="setup-skip-button"]').first().click();
+
+    // Step 5: Skills — get started
+    await page.locator('[data-testid="setup-get-started-button"]').click();
 
     // Wait for Chat UI to appear after setup completes
     await expect(page.locator('button[title="Toggle sidebar"], textarea').first()).toBeVisible({

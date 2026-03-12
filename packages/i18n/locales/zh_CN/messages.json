@@ -58,6 +58,78 @@
   "firstRun_startChatting": {
     "message": "开始聊天"
   },
+  "firstRun_stepModel": {
+    "message": "Model"
+  },
+  "firstRun_stepChannels": {
+    "message": "Channels"
+  },
+  "firstRun_stepAgent": {
+    "message": "Agent"
+  },
+  "firstRun_stepTools": {
+    "message": "Tools"
+  },
+  "firstRun_step2Title": {
+    "message": "Connect Channels"
+  },
+  "firstRun_step2Description": {
+    "message": "Optionally connect a Telegram bot to chat from your phone."
+  },
+  "firstRun_step3Title": {
+    "message": "Customize Your Agent"
+  },
+  "firstRun_step3Description": {
+    "message": "Give your AI assistant a name and personality."
+  },
+  "firstRun_step4Title": {
+    "message": "Enable Tools"
+  },
+  "firstRun_step4Description": {
+    "message": "Choose which tools your AI assistant can use."
+  },
+  "firstRun_next": {
+    "message": "Next"
+  },
+  "firstRun_skip": {
+    "message": "Skip"
+  },
+  "firstRun_getStarted": {
+    "message": "Get Started"
+  },
+  "firstRun_telegramBotToken": {
+    "message": "Telegram Bot Token"
+  },
+  "firstRun_telegramValidate": {
+    "message": "Validate"
+  },
+  "firstRun_telegramValidated": {
+    "message": "Token valid"
+  },
+  "firstRun_telegramAllowedUsers": {
+    "message": "Allowed User IDs (comma-separated)"
+  },
+  "firstRun_whatsappNote": {
+    "message": "WhatsApp can be connected later via Settings > Channels (requires QR code scan)."
+  },
+  "firstRun_agentName": {
+    "message": "Agent Name"
+  },
+  "firstRun_agentEmoji": {
+    "message": "Agent Emoji"
+  },
+  "firstRun_stepSkills": {
+    "message": "Skills"
+  },
+  "firstRun_step5Title": {
+    "message": "Enable Skills"
+  },
+  "firstRun_step5Description": {
+    "message": "Skills are reusable prompt templates that extend your assistant's capabilities."
+  },
+  "firstRun_noSkills": {
+    "message": "No skills available yet. You can add skills later in Settings."
+  },
   "firstRun_advancedSetup": {
     "message": "高级设置"
   },

@@ -64,7 +64,7 @@ import {
   executeRename,
 } from './workspace';
 import { createLogger } from '../logging/logger-buffer';
-import { DOCUMENTS_ENABLED, DEBUGGER_TOOL_ENABLED } from '@extension/env';
+import { DOCUMENTS_ENABLED } from '@extension/env';
 import { toolConfigStorage, activeAgentStorage, getAgent } from '@extension/storage';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
@@ -601,8 +601,8 @@ const getAgentTools = async (opts?: {
     });
   }
 
-  // Debugger tool — gated by feature flag
-  if (DEBUGGER_TOOL_ENABLED && isEnabled('debugger')) {
+  // Debugger tool
+  if (isEnabled('debugger')) {
     tools.push({
       name: 'debugger',
       label: 'Debugger',

@@ -1,266 +1,228 @@
-# Code Review Agent Prompt
+# Code Review: Multi-Step Onboarding Wizard + Debugger Feature Flag Removal
 
-## Mission
+## Summary
 
-You are an autonomous code review agent. Your job is to find feature branches created by the coding agent, review them for correctness and quality, run the quality gate, and merge approved branches into the base branch. You operate entirely on the local git repository — no GitHub, no remote pushes.
+Two distinct changes:
 
----
+1. **Onboarding wizard expansion** (`first-run-setup.tsx`): The single-step model setup was expanded to a 5-step wizard covering Model, Channels, Agent, Tools, and Skills. The implementation is generally well-structured with good separation of concerns per step, proper loading states in most places, and consistent i18n coverage across all 7 locales. However, there are several correctness and robustness issues that should be addressed.
 
-## Entry Protocol
-
-On every invocation:
-
-1. Identify the default branch:
-   ```bash
-   git branch --list main master
-   ```
-   Use whichever exists (`main` preferred). This is `BASE_BRANCH` for the rest of this document.
-
-2. List unmerged feature branches:
-   ```bash
-   git branch --no-merged $BASE_BRANCH --format='%(refname:short)'
-   ```
-   Only consider branches matching the naming convention: `feat/*`, `fix/*`, `refactor/*`, `test/*`, `docs/*`, `chore/*`, `agent/*`.
-
-3. Read `agent_logs/.review_state` to check which branches have already been reviewed at their current HEAD SHA. Skip those.
-
-4. If no branches need review, output `"No branches to review."` and exit immediately.
-
-5. Otherwise, process each reviewable branch one at a time using the Review Process below.
+2. **Debugger feature flag removal**: The `CEB_ENABLE_DEBUGGER_TOOL` env variable and `DEBUGGER_TOOL_ENABLED` constant were removed, making the debugger tool always available (gated only by the user's `enabledTools` config, where it defaults to `false`). This is a clean removal with properly updated tests.
 
 ---
 
-## Review Process
+## Critical Issues
 
-For each branch, perform these steps in order.
+### C1. Step 5 `useEffect` has no error handling -- can hang forever
 
-### Step 1: Gather Context
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 679-713
 
-```bash
-# Commit history on the branch
-git log $BASE_BRANCH..<branch> --oneline
+The `load()` async function inside `useEffect` calls `getDefaultAgent()`, potentially `createAgent()`, `seedPredefinedWorkspaceFiles()`, `listSkillFiles()`, and `parseSkillFrontmatter()`. None of this is wrapped in try/catch. If any of these IndexedDB operations fail (storage quota exceeded, DB corruption, permission error), the promise rejects silently, `setLoading(false)` is never called, and the user sees an infinite loading spinner with no way to proceed.
 
-# File-level summary of changes
-git diff $BASE_BRANCH...<branch> --stat
-
-# Full diff
-git diff $BASE_BRANCH...<branch>
+```tsx
+useEffect(() => {
+  const load = async () => {
+    let agent = await getDefaultAgent();
+    if (!agent) {
+      agent = { /* ... */ };
+      await createAgent(agent);          // Can throw
+      await seedPredefinedWorkspaceFiles('main');  // Can throw
+    }
+    const files = await listSkillFiles();  // Can throw
+    // ... parseSkillFrontmatter per file
+    setSkills(entries);
+    setLoading(false);  // Never reached if any await above throws
+  };
+  load();
+}, []);
 ```
 
-Read the commit messages. Understand the **intent** of the changes before reviewing the code.
+**Fix:** Wrap the `load()` body in try/catch. In the catch block, call `setLoading(false)` and display an error message. Or use a `finally` block for `setLoading(false)`.
 
-If the diff is very large (>2000 lines), focus on the `--stat` summary first, then read the diff file-by-file using `git diff $BASE_BRANCH...<branch> -- <path>` for the most critical files.
+### C2. Step 4 (Tools) silently swallows errors -- user gets stuck
 
-### Step 2: Code Review
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 595-606
 
-Review the diff against these criteria, in priority order:
+`handleNext` has `try/finally` but no `catch`. If `toolConfigStorage.set()` throws, the error is silently lost. `onNext()` is inside the `try` block, so the step never advances. The `finally` block clears `saving`, so the button re-enables, but no error message is shown. The user can click "Next" repeatedly with no feedback about the failure.
 
-1. **Correctness** — Does the code do what the commit message claims? Are there logic errors, off-by-one bugs, null/undefined hazards, or race conditions?
-2. **Security** — Any XSS vectors, injection risks, hardcoded secrets, or exposed credentials? Check for OWASP top-10 issues.
-3. **Regressions** — Could these changes break existing functionality? Look for removed exports, changed function signatures, or altered control flow that other code depends on.
-4. **TypeScript quality** — Proper typing (no unnecessary `any`), correct use of generics, type narrowing where needed.
-5. **Dead code** — Unused imports, unreachable branches, commented-out code that should be removed.
-6. **Complexity** — Over-engineered abstractions, premature generalization, or code that could be significantly simpler.
+Additionally, Step 4 does not declare an `error` state variable at all, unlike Steps 1-3.
 
-Do NOT nitpick:
-- Formatting and style (the linter handles this)
-- Minor naming preferences
-- Comment style or presence of comments
-
-### Step 3: Check Commit Messages
-
-The branch's commit history should have a clear, readable final commit message following this format:
-
-```
-<type>: <short summary (imperative, ≤72 chars)>
-
-<Why this change was made — the problem or need it addresses.>
-
-<What changed — bullet list of key modifications.>
-
-<How it was verified — which tests/gates passed.>
+```tsx
+const handleNext = useCallback(async () => {
+  setSaving(true);
+  try {
+    await toolConfigStorage.set({ enabledTools, webSearchConfig: defaultWebSearchConfig });
+    onNext();
+  } finally {
+    setSaving(false);
+  }
+}, [enabledTools, onNext]);
 ```
 
-Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `agent`.
+**Fix:** Add `const [error, setError] = useState('')` to Step 4. Add a `catch` block that calls `setError(...)`. Add the error display JSX that the other steps already have.
 
-Poor commit messages are a **minor** finding — they should not block merging if the code itself is correct.
+### C3. Step 5 (Skills) `handleGetStarted` silently swallows errors
 
-### Step 4: Run Quality Gate
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 719-729
 
-Switch to the branch and run the quality checks:
+Same pattern as C2. `Promise.all(skills.map(...))` is in a try/finally with no catch. If any `updateWorkspaceFile` call fails, `onComplete()` is never called. The button re-enables but the user gets no error feedback and cannot complete the wizard.
 
-```bash
-git checkout <branch>
-cd extension && pnpm build && pnpm lint && pnpm type-check 2>&1 | tee ../agent_logs/review_gate_<branch-slug>.log
-```
-
-Check the exit code. If the project has unit tests configured, also run:
-
-```bash
-pnpm test 2>&1 | tee -a ../agent_logs/review_gate_<branch-slug>.log
-```
-
-Read only the summary/exit status — do not dump the full log into your working context. The full output is saved to the log file for reference.
-
-### Step 5: Decision
-
-Weigh the evidence from Steps 2–4 and make a decision.
-
-#### APPROVE → Merge
-
-Approve the branch if:
-- The quality gate passes (Step 4)
-- No critical or high-severity findings from the code review (Step 2)
-- The changes match the stated intent
-
-Merge procedure:
-
-```bash
-git checkout $BASE_BRANCH
-git merge --no-ff <branch> -m "<merge commit message>"
-```
-
-Use this format for the merge commit message:
-
-```
-merge: <type>/<short-description>
-
-Reviewed-by: code-review-agent
-Branch: <branch-name>
-Commits: <N>
-Quality-gate: PASSED
-
-Summary:
-- <bullet 1: what this branch does>
-- <bullet 2: key changes>
-- <bullet 3: how it was verified>
-```
-
-After a successful merge, record it in the review state file:
-
-```bash
-echo "<branch-name> <head-sha> MERGED $(date -Iseconds)" >> agent_logs/.review_state
-```
-
-Then delete the merged branch to keep the repo clean:
-
-```bash
-git branch -d <branch>
-```
-
-#### REQUEST CHANGES → Do Not Merge
-
-Reject the branch if:
-- The quality gate fails, OR
-- There are critical bugs, security issues, or regressions in the code review
-
-Do NOT merge. Instead:
-
-1. Write a detailed review report to `agent_logs/review_<branch-slug>.md`:
-
-   ```markdown
-   # Review: <branch-name>
-
-   **Decision:** CHANGES REQUESTED
-   **Reviewed at:** <sha>
-   **Date:** <timestamp>
-   **Reviewer:** code-review-agent
-
-   ## Quality Gate
-
-   <PASSED | FAILED>
-
-   <If failed, list each failing step (build/lint/type-check/test) with a 1-line summary of the failure.>
-
-   ## Findings
-
-   ### Finding 1: <short title>
-
-   - **Severity:** Critical | High | Medium | Low
-   - **Location:** `<file>:<line>`
-   - **Category:** Bug | Security | Regression | Type Safety | Dead Code | Complexity
-
-   **Problem:**
-   <2-5 sentence description of what is wrong, why it is wrong, and what impact it has (e.g. runtime crash, data loss, security vulnerability). Include the relevant code snippet if it aids clarity.>
-
-   **Suggested Fix:**
-   <Concrete guidance on how to fix — describe the approach, include a short code snippet if helpful. If multiple valid approaches exist, recommend one and briefly mention alternatives.>
-
-   **Suggested Tests:**
-   <1-3 bullet points describing test cases that would catch this issue. Include the test description and what assertion to make.>
-
-   ---
-
-   ### Finding 2: <short title>
-   ...
-
-   ## Summary
-
-   <2-3 sentence overview: what the branch does correctly, what must change before it can merge, and the overall effort estimate (trivial fix / moderate rework / significant rework).>
-   ```
-
-2. Record in the review state file:
-
-   ```bash
-   echo "<branch-name> <head-sha> CHANGES_REQUESTED $(date -Iseconds)" >> agent_logs/.review_state
-   ```
-
-#### MERGE CONFLICT → Skip
-
-If the merge fails due to conflicts:
-
-1. Abort the merge:
-   ```bash
-   git merge --abort
-   ```
-
-2. Record in the review state file:
-   ```bash
-   echo "<branch-name> <head-sha> MERGE_CONFLICT $(date -Iseconds)" >> agent_logs/.review_state
-   ```
-
-3. Write a brief note to `agent_logs/review_<branch-slug>.md` explaining the conflict.
-
-4. Move on to the next branch.
-
-### Step 6: Return to base branch
-
-Always return to the base branch before processing the next branch or exiting:
-
-```bash
-git checkout $BASE_BRANCH
-```
-
-### Step 7: Next branch
-
-If there are more branches to review, go back to Step 1 for the next branch. When all branches are processed, exit.
+**Fix:** Add error state and a catch block.
 
 ---
 
-## Review State File
+## Warnings
 
-The file `agent_logs/.review_state` tracks all review decisions. Format (one line per review, append-only):
+### W1. Duplicate agent creation paths between Steps 3 and 5
 
+**File:** `packages/ui/lib/components/first-run-setup.tsx`
+
+Both Step 3 (lines 471-498) and Step 5 (lines 680-694) independently check for and potentially create a default agent. If the user skips Step 3, Step 5 creates an agent with hardcoded defaults (`name: 'Main Agent'`, `emoji: robot`). If the user completes Step 3 with a custom name/emoji then arrives at Step 5, Step 5 finds the existing agent and proceeds normally.
+
+The issue: the agent creation logic is duplicated and the fallback defaults in Step 5 may not match what the user expects. If Step 3's `createAgent` call succeeded but `seedPredefinedWorkspaceFiles` failed (leaving a partial state), Step 5 would see the agent as existing and skip seeding workspace files -- meaning skills may not be available.
+
+**Recommendation:** Consider having Step 3's skip handler create the default agent (with defaults) rather than skipping entirely. This would eliminate the need for Step 5 to handle agent creation.
+
+### W2. Unused i18n key: `firstRun_startChatting`
+
+**Files:** All 7 locale `messages.json` files define `firstRun_startChatting` (e.g., `en/messages.json` line 58) but it is never referenced in `first-run-setup.tsx`. This appears to be a leftover from the previous single-step wizard.
+
+### W3. Documentation still references removed `CEB_ENABLE_DEBUGGER_TOOL`
+
+**Files:**
+- `CLAUDE.md` line 142: `CEB_ENABLE_DEBUGGER_TOOL=false   # Enable CDP debugger tool`
+- `README.md` line 349: references `CEB_ENABLE_DEBUGGER_TOOL`
+
+Both files should be updated to remove references to the deleted env variable.
+
+### W4. Step 3 error message is not internationalized
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, line 496
+
+```tsx
+setError(err instanceof Error ? err.message : 'Failed to save agent');
 ```
-<branch-name> <head-sha> <MERGED|CHANGES_REQUESTED|MERGE_CONFLICT> <ISO-timestamp>
+
+The fallback string `'Failed to save agent'` is a hardcoded English string. All other error messages in the component use `t('firstRun_...')` for i18n. This should use a localized key (e.g., `t('firstRun_saveFailed')` which already exists, or a new agent-specific key).
+
+### W5. `t` missing from `useCallback` dependency array in Step 3
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, line 499
+
+```tsx
+}, [agentName, agentEmoji, onNext]);
 ```
 
-When the coding agent pushes new commits to a `CHANGES_REQUESTED` branch (changing its HEAD SHA), the runner script will automatically detect the new SHA and queue it for re-review.
+While the current code doesn't call `t()` inside this callback, if the hardcoded string is fixed per W4, `t` would need to be in the dependency array. Other step handlers consistently include `t`.
+
+### W6. Step 2 allows saving unvalidated credentials
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 347-373
+
+A user can type a bot token and click "Next" without clicking "Validate". The code sends `CHANNEL_SAVE_CONFIG` with potentially invalid credentials. The extension may then start polling with a bad token, causing repeated API errors in the background.
+
+**Recommendation:** Either require validation before enabling the "Next" button when a token is present, or make the "Next" button text/behavior clearer (e.g., "Save & Continue" vs "Skip").
+
+### W7. `listSkillFiles()` called without `agentId` -- returns all agents' skills
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, line 696
+
+```tsx
+const files = await listSkillFiles();
+```
+
+The function signature is `listSkillFiles(agentId?: string): Promise<DbWorkspaceFile[]>`. Without an `agentId`, it returns skill files across all agents. During first run this is likely fine (there's only one agent), but for robustness and correctness, pass `'main'`:
+
+```tsx
+const files = await listSkillFiles('main');
+```
+
+### W8. E2E test skip-button selector is fragile
+
+**File:** `tests/playwright/helpers/setup.ts`, lines 34-40
+
+```typescript
+await page.locator('[data-testid="setup-skip-button"]').first().click();
+```
+
+Steps 2, 3, and 4 all use `data-testid="setup-skip-button"`. The test relies on `.first()` which works because only one step renders at a time due to the `{step === N && ...}` pattern. However, if the animation (`animate-in fade-in`) causes brief overlap during transitions, multiple elements could match. Consider adding per-step unique test IDs (e.g., `setup-skip-channels`, `setup-skip-agent`, `setup-skip-tools`).
+
+### W9. No wait between E2E skip clicks
+
+**File:** `tests/playwright/helpers/setup.ts`, lines 34-40
+
+The test clicks skip buttons sequentially without waiting for the step transition to complete:
+
+```typescript
+await page.locator('[data-testid="setup-skip-button"]').first().click();
+await page.locator('[data-testid="setup-skip-button"]').first().click();
+await page.locator('[data-testid="setup-skip-button"]').first().click();
+```
+
+Playwright's auto-waiting should handle this in most cases, but since the wizard uses `animate-in fade-in`, there could be timing issues where the old step's button is clicked before the new step renders. Consider adding `waitFor` assertions between clicks, e.g.:
+
+```typescript
+await page.locator('[data-testid="setup-skip-button"]').first().click();
+await expect(page.locator('text=Configure your agent')).toBeVisible();
+```
 
 ---
 
-## Working Rules
+## Suggestions
 
-1. **Be thorough but pragmatic.** Focus on real bugs and security issues, not style preferences. The linter and formatter handle style.
-2. **One branch at a time.** Fully complete the review of one branch (including merge or rejection) before starting the next.
-3. **Always return to the base branch** after each review — whether merging, rejecting, or hitting a conflict.
-4. **Never modify code on feature branches.** You are a reviewer. If changes are needed, request them — the coding agent will fix and push new commits.
-5. **Never force-push, rebase, or rewrite history.** You read and merge — nothing destructive.
-6. **Never push to remote.** All operations are local.
-7. **Pipe test output to files.** Always use `tee` or redirection to save gate results to `agent_logs/`. Only read the summary, not full verbose output.
-8. **Log everything.** Every review decision gets recorded in `.review_state` and detailed findings go to `agent_logs/review_*.md`.
-9. **When in doubt, reject.** It is better to request changes than to merge buggy code. The coding agent can fix and resubmit.
+### S1. Persist wizard progress to survive mid-wizard browser close
+
+If the user closes the browser after Step 1 (which persists the model to `customModelsStorage`), the first-run check (`models.length === 0`) will be false on re-open. The wizard will not show again, but Steps 2-5 were never completed. The user enters the chat UI without agent setup, tool configuration, or skills.
+
+Consider either:
+- Storing the current wizard step in Chrome storage and resuming on re-open
+- Ensuring the app gracefully initializes defaults for anything the wizard would have configured
+
+### S2. Add accessibility attributes to StepIndicator
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 108-134
+
+The step indicator is visual-only. For screen reader users:
+- Wrap in `<nav aria-label="Setup progress">`
+- Add `aria-current="step"` to the active step
+- Consider `role="list"` / `role="listitem"` for the step items
+
+### S3. Emoji input `maxLength={2}` is too restrictive
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, line 532
+
+Many emoji (flags, skin-tone variants, ZWJ sequences like family emoji) have JavaScript string lengths > 2. `maxLength={2}` will prevent users from entering these. Consider using a higher limit (e.g., 10) or a grapheme-segmenter-based check.
+
+### S4. Consider extracting step components to separate files
+
+At 829 lines, `first-run-setup.tsx` is large. Each step component is self-contained and could live in its own file for improved maintainability and code navigation.
+
+### S5. Add `data-testid` to "Next" buttons in Steps 2-4
+
+Currently only Step 1's button (`setup-start-button`) and Step 5's button (`setup-get-started-button`) have test IDs. Adding IDs to the intermediate "Next" buttons would enable more targeted E2E testing.
+
+### S6. `iconMap` has no fallback for unknown icon names
+
+**File:** `packages/ui/lib/components/first-run-setup.tsx`, lines 87-104
+
+If `toolRegistryMeta` gains a new group with an `iconName` not in the `iconMap`, the icon renders as `undefined` (nothing shown). Consider a fallback:
+
+```tsx
+<span className="text-muted-foreground">{iconMap[group.iconName] ?? <SettingsIcon className="size-4" />}</span>
+```
 
 ---
 
-*Now begin. Follow the Entry Protocol above.*
+## Files Reviewed
+
+| File | Notes |
+|------|-------|
+| `packages/ui/lib/components/first-run-setup.tsx` | 829-line wizard component. Well-structured per-step separation. Missing error handling in Steps 4 and 5 (Critical). Uninternationalized error in Step 3. |
+| `packages/i18n/locales/{en,de,fr,es,ja,zh_CN,zh_TW}/messages.json` | All 7 locales have 33 matching `firstRun_*` keys. One unused key (`firstRun_startChatting`). Telegram keys (`telegram_invalidToken`, etc.) pre-exist in all locales. |
+| `tests/playwright/helpers/setup.ts` | Updated to click through all 5 wizard steps. Functional but fragile due to shared `data-testid` and no inter-step waits. |
+| `packages/env/lib/const.ts` | Clean removal of `DEBUGGER_TOOL_ENABLED` constant. 10 lines, no issues. |
+| `packages/env/lib/types.ts` | Clean removal of `CEB_ENABLE_DEBUGGER_TOOL` from `ICebEnv`. 17 lines, no issues. |
+| `packages/shared/lib/tool-registry.ts` | Removed debugger feature-flag filter from `filteredToolRegistryMeta`. Debugger group now always included (still defaults to disabled). No issues. |
+| `chrome-extension/src/background/tools/index.ts` | Removed feature-flag gate for debugger tool. Now purely config-driven via `isEnabled('debugger')`. Clean change. |
+| `chrome-extension/src/background/tools/tool-definitions.test.ts` | Debugger tests updated to verify enable/disable via tool config. Comprehensive, covering both `getAgentTools` and `executeTool`. No issues. |
+| `.env` | Removed `CEB_ENABLE_DEBUGGER_TOOL` line. File is clean. |
+| `CLAUDE.md` / `README.md` | Still reference `CEB_ENABLE_DEBUGGER_TOOL` -- stale documentation (Warning W3). |

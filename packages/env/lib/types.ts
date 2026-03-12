@@ -6,7 +6,6 @@ interface ICebEnv {
   readonly CEB_ENABLE_DOCUMENTS: string;
   readonly CEB_ENABLE_WHATSAPP: string;
   readonly CEB_ENABLE_WEBGPU_MODELS: string;
-  readonly CEB_ENABLE_DEBUGGER_TOOL: string;
 }
 
 interface ICebCliEnv {
