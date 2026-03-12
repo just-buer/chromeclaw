@@ -374,4 +374,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=algopian/chromeclaw&type=Date)](https://star-history.com/#algopian/chromeclaw&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=algopian/chromeclaw&type=date&legend=top-left)](https://www.star-history.com/?repos=algopian%2Fchromeclaw&type=date&legend=top-left)
