@@ -133,7 +133,7 @@ const loadModel = async (modelId: string, device?: string): Promise<void> => {
       const warmupOutput = await model.generate({ ...warmupInputs, max_new_tokens: 4 });
       // Decode only generated tokens (skip input) to check for garbage
       const inputLen = warmupInputs.input_ids.dims[1];
-      const allIds = Array.from(warmupOutput[0].data).map(Number);
+      const allIds = Array.from((warmupOutput as any)[0].data).map(Number);
       const genText = tokenizer
         .decode(allIds.slice(inputLen), { skip_special_tokens: true })
         .trim();
