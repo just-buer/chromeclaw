@@ -27,7 +27,7 @@ const spawnSubagentSchema = Type.Object({
   }),
   tools: Type.Optional(
     Type.Array(Type.String(), {
-      description: 'Tool names to allow (defaults to safe whitelist)',
+      description: 'Tool names to allow (defaults to all enabled agent tools)',
     }),
   ),
 });
@@ -42,16 +42,6 @@ type SpawnSubagentArgs = Static<typeof spawnSubagentSchema>;
 type KillSubagentArgs = Static<typeof killSubagentSchema>;
 
 // ── Constants ──────────────────────────
-
-const SUBAGENT_TOOL_WHITELIST = new Set([
-  'web_search',
-  'web_fetch',
-  'write',
-  'edit',
-  'list',
-  'read',
-  'scheduler',
-]);
 
 const MAX_CONCURRENT = 3;
 const REGISTRY_TTL_MS = 30 * 60 * 1000; // 30 min
@@ -190,26 +180,21 @@ const runSubagentBackground = async (run: SubagentRun, args: SpawnSubagentArgs, 
     }
 
     // Dynamic import to avoid circular dependency (subagent.ts ↔ index.ts)
-    const { getAgentTools, getToolConfig, getImplementedToolNames } = await import('./index');
+    const { getAgentTools, getToolConfig } = await import('./index');
 
-    // Resolve whitelisted tools
-    const toolConfig = await getToolConfig();
-    const implementedTools = getImplementedToolNames();
-    const requestedTools = args.tools ? new Set(args.tools) : SUBAGENT_TOOL_WHITELIST;
+    // Get all agent tools (headless: true excludes subagent, scheduler, deep_research, agents_list)
+    const allTools = await getAgentTools({ headless: true });
 
-    // Intersect: requested ∩ whitelist ∩ enabled ∩ implemented
-    const allowedToolNames = new Set<string>();
-    for (const name of requestedTools) {
-      if (
-        SUBAGENT_TOOL_WHITELIST.has(name) &&
-        (toolConfig.enabledTools[name] ?? false) &&
-        implementedTools.has(name)
-      ) {
-        allowedToolNames.add(name);
-      }
-    }
+    // If caller specified a subset, filter to just those
+    const requestedSet = args.tools ? new Set(args.tools) : null;
+    const filteredTools = requestedSet
+      ? allTools.filter(t => requestedSet.has(t.name))
+      : allTools;
+
+    const allowedToolNames = new Set(filteredTools.map(t => t.name));
 
     // Build tool listings and prompt hints for allowed tools
+    const toolConfig = await getToolConfig();
     const toolListings = resolveToolListings(toolConfig.enabledTools, undefined, allowedToolNames);
     const toolPromptHints = resolveToolPromptHints(
       toolConfig.enabledTools,
@@ -223,10 +208,6 @@ const runSubagentBackground = async (run: SubagentRun, args: SpawnSubagentArgs, 
       tools: toolListings,
       toolPromptHints,
     });
-
-    // Get agent tools filtered to whitelist
-    const allTools = await getAgentTools({ headless: true });
-    const filteredTools = allTools.filter(t => allowedToolNames.has(t.name));
 
     const displayTask = options?.label ?? args.task;
 
@@ -496,7 +477,6 @@ export {
   buildSubagentContext,
   SUBAGENT_IDENTITY,
   // Constants (testing)
-  SUBAGENT_TOOL_WHITELIST,
   MAX_CONCURRENT,
   SUBAGENT_KEEP_ALIVE_ALARM,
   registry,
