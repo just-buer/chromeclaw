@@ -35,10 +35,18 @@ Preserve ALL of the following verbatim (do not paraphrase):
 - List any tool calls that failed, with the error message
 - List files that were read, created, or modified
 
+### 7. CURRENT TASK STATE
+What is the assistant actively working on right now? Include:
+- The specific task or sub-task in progress
+- Key state/data accumulated (tab IDs, file paths, variable values, URLs)
+- What the next planned step was before this summary
+- Any blocking issues or failed approaches already tried
+
 ## Rules
 - If a section has no content, write "None" — do not omit the section
 - Prefer exact quotes over paraphrasing for technical content
-- Keep the total summary under 800 tokens`;
+- The CURRENT TASK STATE section is critical — prioritize it over older history
+- Keep the total summary under 1200 tokens`;
 
 const MERGE_PROMPT = `You are given multiple partial summaries of a single conversation. Merge them into one cohesive structured summary using the same section format.
 
@@ -49,12 +57,14 @@ const MERGE_PROMPT = `You are given multiple partial summaries of a single conve
 4. PENDING USER ASKS
 5. EXACT IDENTIFIERS
 6. TOOL FAILURES & FILE OPERATIONS
+7. CURRENT TASK STATE
 
 ## Rules
 - Merge overlapping content, removing duplicates
 - Preserve all exact identifiers from all parts
 - If sections conflict, prefer the later part (more recent)
-- Keep the total under 800 tokens
+- The CURRENT TASK STATE section is critical — take it from the latest part
+- Keep the total under 1200 tokens
 - Do not add information not present in the partial summaries`;
 
 /** Max chars per recent turn to embed verbatim in the summary */
@@ -82,6 +92,7 @@ const PREFERRED_SECTIONS = [
   'PENDING USER',
   'EXACT IDENTIFIERS',
   'TOOL FAILURES',
+  'CURRENT TASK STATE',
 ];
 
 /**
@@ -419,7 +430,7 @@ const extractCriticalRules = (workspaceFiles: Array<{ name: string; content: str
 // ── Summarization functions ─────────────────────
 
 /** Max chars for the LLM-generated summary (before appending recent turns) */
-const MAX_SUMMARY_CHARS = 6000;
+const MAX_SUMMARY_CHARS = 8000;
 
 /** Timeout for the entire summarization process (ms) */
 const SUMMARIZATION_TIMEOUT_MS = 120_000;
@@ -476,7 +487,7 @@ const summarizeMessagesImpl = async (
         : SUMMARY_PROMPT;
 
       lastSummary = await completeText(modelConfig, prompt, enrichedTranscript, {
-        maxTokens: 800,
+        maxTokens: 1200,
       });
 
       // Cap LLM output before appending recent turns
@@ -583,7 +594,7 @@ const summarizeInStages = async (
         modelConfig,
         `${SUMMARY_PROMPT}\n\nThis is part ${i + 1} of ${parts.length} of the conversation.`,
         enrichedTranscript,
-        { maxTokens: 800 },
+        { maxTokens: 1200 },
       );
     }),
   );
@@ -616,7 +627,7 @@ const summarizeInStages = async (
     .join('\n\n');
 
   let finalSummary = await completeText(modelConfig, MERGE_PROMPT, mergeInput, {
-    maxTokens: 1000,
+    maxTokens: 1200,
   });
 
   // Append recent turns from the last part

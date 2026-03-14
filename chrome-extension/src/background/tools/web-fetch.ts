@@ -16,9 +16,23 @@ const log = createLogger('tool');
 
 const webFetchSchema = Type.Object({
   url: Type.String({ description: 'The URL to fetch content from' }),
+  method: Type.Optional(
+    Type.Union([Type.Literal('GET'), Type.Literal('POST')], {
+      description: 'HTTP method (default: GET)',
+    }),
+  ),
+  headers: Type.Optional(
+    Type.Record(Type.String(), Type.String(), {
+      description: 'Custom request headers (e.g. Content-Type, Authorization)',
+    }),
+  ),
+  body: Type.Optional(
+    Type.String({ description: 'Request body (typically JSON string for POST requests)' }),
+  ),
   extractMode: Type.Optional(
-    Type.Union([Type.Literal('text'), Type.Literal('html')], {
-      description: 'Extraction mode: "text" strips HTML (default), "html" returns raw',
+    Type.Union([Type.Literal('text'), Type.Literal('html'), Type.Literal('binary')], {
+      description:
+        'Extraction mode: "text" strips HTML (default), "html" returns raw, "binary" returns base64 data URI for images/files',
     }),
   ),
   maxChars: Type.Optional(
@@ -32,6 +46,10 @@ interface WebFetchResult {
   text: string;
   title?: string;
   status: number;
+  mimeType?: string;
+  sizeBytes?: number;
+  isBase64?: boolean;
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,6 +64,27 @@ const CACHE_TTL_MS = 5 * 60_000;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MAX_CHARS = 30_000;
+const BINARY_DEFAULT_MAX_CHARS = 2_000_000;
+const BINARY_MAX_BYTES = 10_000_000; // 10 MB hard limit
+
+// ---------------------------------------------------------------------------
+// Base64 encoding — chunked to avoid stack overflow on large arrays
+// ---------------------------------------------------------------------------
+
+const uint8ToBase64 = (bytes: Uint8Array): string => {
+  // Process in 3072-byte chunks (multiple of 3 → 4096 base64 chars each).
+  // Encoding per-chunk avoids the O(n²) join + single btoa() on huge strings.
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += 3072) {
+    const slice = bytes.subarray(i, i + 3072);
+    let s = '';
+    for (let j = 0; j < slice.length; j++) {
+      s += String.fromCharCode(slice[j]!);
+    }
+    parts.push(btoa(s));
+  }
+  return parts.join('');
+};
 
 // ---------------------------------------------------------------------------
 // HTML entity decoding
@@ -119,18 +158,86 @@ const extractText = (html: string, maxChars: number): string => {
 // ---------------------------------------------------------------------------
 
 const executeWebFetch = async (args: WebFetchArgs): Promise<WebFetchResult> => {
-  const { url, extractMode, maxChars = DEFAULT_MAX_CHARS } = args;
-  log.trace('[webFetch] fetching', { url, extractMode, maxChars });
+  const { url, method, headers, body, extractMode, maxChars = DEFAULT_MAX_CHARS } = args;
+  const isPost = method === 'POST';
+  log.trace('[webFetch] fetching', { url, method, extractMode, maxChars });
 
-  // Check cache
-  const cacheKey = normalizeCacheKey(`${url}:${extractMode ?? 'text'}:${maxChars}`);
-  const cached = readCache(FETCH_CACHE, cacheKey, CACHE_TTL_MS);
-  if (cached) {
-    log.trace('[webFetch] cache hit', { url });
-    return cached;
+  // Check cache (skip for POST — non-idempotent)
+  const cacheKey = normalizeCacheKey(`${method ?? 'GET'}:${url}:${extractMode ?? 'text'}:${maxChars}`);
+  if (!isPost) {
+    const cached = readCache(FETCH_CACHE, cacheKey, CACHE_TTL_MS);
+    if (cached) {
+      log.trace('[webFetch] cache hit', { url });
+      return cached;
+    }
   }
 
-  const response = await fetch(url, { signal: withTimeout(30) });
+  const fetchInit: RequestInit = { signal: withTimeout(30) };
+  if (method) fetchInit.method = method;
+  if (body) fetchInit.body = body;
+  if (headers) fetchInit.headers = headers;
+  const response = await fetch(url, fetchInit);
+
+  // ── Binary mode: return base64 data URI ──
+  if (extractMode === 'binary') {
+    const rawContentType = response.headers.get('content-type') || 'application/octet-stream';
+    const mimeType = rawContentType.split(';')[0]!.trim();
+
+    // Pre-check Content-Length to avoid downloading huge files
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > BINARY_MAX_BYTES) {
+      return {
+        text: '',
+        status: response.status,
+        mimeType,
+        sizeBytes: contentLength,
+        isBase64: true,
+        error: `Binary content too large: ${contentLength} bytes exceeds ${BINARY_MAX_BYTES} byte limit`,
+      };
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // Post-download size check (Content-Length may be absent or wrong)
+    if (bytes.length > BINARY_MAX_BYTES) {
+      return {
+        text: '',
+        status: response.status,
+        mimeType,
+        sizeBytes: bytes.length,
+        isBase64: true,
+        error: `Binary content too large: ${bytes.length} bytes exceeds ${BINARY_MAX_BYTES} byte limit`,
+      };
+    }
+
+    const base64 = uint8ToBase64(bytes);
+    const dataUri = `data:${mimeType};base64,${base64}`;
+
+    // Auto-increase maxChars for binary mode
+    const effectiveMaxChars = Math.max(maxChars, BINARY_DEFAULT_MAX_CHARS);
+    if (dataUri.length > effectiveMaxChars) {
+      return {
+        text: '',
+        status: response.status,
+        mimeType,
+        sizeBytes: bytes.length,
+        isBase64: true,
+        error: `Base64 data URI too large: ${dataUri.length} chars exceeds maxChars ${effectiveMaxChars}. Pass a larger maxChars to allow it.`,
+      };
+    }
+
+    // Skip cache for binary results (large + rarely re-fetched)
+    return {
+      text: dataUri,
+      status: response.status,
+      mimeType,
+      sizeBytes: bytes.length,
+      isBase64: true,
+    };
+  }
+
+  // ── Text / HTML modes (unchanged) ──
   const html = await response.text();
 
   // Extract title from <title> tag
@@ -146,8 +253,8 @@ const executeWebFetch = async (args: WebFetchArgs): Promise<WebFetchResult> => {
 
   const result: WebFetchResult = { text, title, status: response.status };
 
-  // Cache successful results
-  if (response.ok && text.length > 0) {
+  // Cache successful text results (skip for POST — non-idempotent)
+  if (!isPost && response.ok && text.length > 0) {
     writeCache(FETCH_CACHE, cacheKey, result);
   }
 
@@ -156,3 +263,42 @@ const executeWebFetch = async (args: WebFetchArgs): Promise<WebFetchResult> => {
 
 export { webFetchSchema, executeWebFetch, FETCH_CACHE, extractText, decodeEntities };
 export type { WebFetchArgs, WebFetchResult };
+
+// ── Tool registration ──
+import type { ToolRegistration, ToolResult } from './tool-registration';
+
+const webFetchToolDef: ToolRegistration = {
+  name: 'web_fetch',
+  label: 'Fetch URL',
+  description:
+    'Fetch content from a URL. Supports GET (default) and POST methods with custom headers and body. Extraction modes: "text" strips HTML (default), "html" returns raw, "binary" returns base64 data URI for images/files. For POST requests, set method: "POST" with body and headers.',
+  schema: webFetchSchema,
+  execute: args => executeWebFetch(args as WebFetchArgs),
+  formatResult: (raw): ToolResult => {
+    const result = raw as WebFetchResult;
+    if (result.isBase64 && result.text) {
+      const mediaType = result.mimeType || 'application/octet-stream';
+      // Only send as image content block when it's actually an image
+      if (mediaType.startsWith('image/')) {
+        const rawBase64 = result.text.replace(/^data:[^;]+;base64,/, '');
+        return {
+          content: [
+            {
+              type: 'image' as const,
+              source: { type: 'base64' as const, media_type: mediaType, data: rawBase64 },
+            },
+          ],
+          details: { mimeType: result.mimeType, sizeBytes: result.sizeBytes },
+        };
+      }
+      // Non-image binary: return metadata (data URI is too large for text block)
+      return {
+        content: [{ type: 'text', text: `Binary content fetched: ${mediaType}, ${result.sizeBytes ?? 0} bytes` }],
+        details: { mimeType: result.mimeType, sizeBytes: result.sizeBytes, dataUri: result.text },
+      };
+    }
+    return { content: [{ type: 'text', text: JSON.stringify(result) }], details: result };
+  },
+};
+
+export { webFetchToolDef };

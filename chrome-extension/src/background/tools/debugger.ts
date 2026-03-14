@@ -97,3 +97,17 @@ const executeDebugger = async (args: DebuggerArgs): Promise<string> => {
 
 export { debuggerSchema, executeDebugger };
 export type { DebuggerArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const debuggerToolDef: ToolRegistration = {
+  name: 'debugger',
+  label: 'Debugger',
+  description:
+    'Send Chrome DevTools Protocol (CDP) commands to browser tabs. Actions: send (execute a CDP command), attach/detach (manage debugger session), list_targets (list debuggable targets).',
+  schema: debuggerSchema,
+  execute: args => executeDebugger(args as DebuggerArgs),
+};
+
+export { debuggerToolDef };

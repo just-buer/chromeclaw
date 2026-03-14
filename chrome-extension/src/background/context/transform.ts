@@ -3,7 +3,7 @@
  * Wraps the existing compaction pipeline as a pi-mono transformContext hook.
  */
 
-import { compactMessagesWithSummary, estimateMessageTokens } from './compaction';
+import { compactMessages, compactMessagesWithSummary, estimateMessageTokens } from './compaction';
 import { enforceToolResultBudget } from './tool-result-context-guard';
 import { chatMessagesToPiMessages } from '../agents/message-adapter';
 import { createLogger } from '../logging/logger-buffer';
@@ -49,6 +49,12 @@ const createTransformContext = (
   const result: TransformResult = { wasCompacted: false };
   let providerLimit: number | undefined;
 
+  // Max summary compaction attempts per stream.
+  // After this limit, fall back to sliding-window only (no LLM summarization) to prevent
+  // infinite compaction loops where each summary loses task context.
+  let summaryCompactionAttempts = 0;
+  const MAX_SUMMARY_COMPACTION_ATTEMPTS = 3;
+
   const transformContext = async (
     messages: AgentMessage[],
     _signal?: AbortSignal,
@@ -86,20 +92,37 @@ const createTransformContext = (
     // Estimate tokens before compaction
     const tokensBefore = guardedMessages.reduce((sum, m) => sum + estimateMessageTokens(m), 0);
 
-    // Run compaction
+    // Run compaction — use sliding-window only after exhausting summary attempts
+    // (3-tier overflow recovery pattern)
+    const useSlidingWindowOnly = summaryCompactionAttempts >= MAX_SUMMARY_COMPACTION_ATTEMPTS;
+
+    if (useSlidingWindowOnly) {
+      compactLog.trace('transformContext: summary compaction limit reached, using sliding-window only', {
+        summaryCompactionAttempts,
+        maxAttempts: MAX_SUMMARY_COMPACTION_ATTEMPTS,
+      });
+    }
+
     const {
       messages: compactedMessages,
       wasCompacted,
       compactionMethod,
       summary,
       durationMs: compactionDurationMs,
-    } = await compactMessagesWithSummary(guardedMessages, opts.modelConfig.id, opts.modelConfig, {
-      systemPromptTokens: opts.systemPromptTokens,
-      existingSummary,
-      contextWindowOverride: effectiveContextWindow,
-      criticalRules,
-      compactionConfig,
-    });
+    } = useSlidingWindowOnly
+      ? compactMessages(guardedMessages, opts.modelConfig.id, opts.systemPromptTokens, effectiveContextWindow)
+      : await compactMessagesWithSummary(guardedMessages, opts.modelConfig.id, opts.modelConfig, {
+          systemPromptTokens: opts.systemPromptTokens,
+          existingSummary,
+          contextWindowOverride: effectiveContextWindow,
+          criticalRules,
+          compactionConfig,
+        });
+
+    // Track summary compaction attempts
+    if (wasCompacted && compactionMethod === 'summary') {
+      summaryCompactionAttempts++;
+    }
 
     compactLog.debug('Compaction', { method: compactionMethod, wasCompacted });
 

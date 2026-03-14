@@ -160,3 +160,19 @@ export {
   buildResearchPrompt,
 };
 export type { DeepResearchArgs, ToolContext };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const deepResearchToolDef: ToolRegistration = {
+  name: 'deep_research',
+  label: 'Deep Research',
+  description:
+    'Conduct deep multi-step web research on a topic in the background. Returns immediately — results appear as a system message when complete.',
+  schema: deepResearchSchema,
+  excludeInHeadless: true,
+  needsContext: true,
+  execute: (args, context) => executeDeepResearch(args as DeepResearchArgs, { chatId: context?.chatId }),
+};
+
+export { deepResearchToolDef };

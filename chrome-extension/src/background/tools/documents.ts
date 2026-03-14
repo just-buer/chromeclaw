@@ -29,3 +29,22 @@ const executeCreateDocument = async (
 
 export { createDocumentSchema, executeCreateDocument };
 export type { CreateDocumentArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration, ToolResult } from './tool-registration';
+
+const createDocumentToolDef: ToolRegistration = {
+  name: 'create_document',
+  label: 'Create Document',
+  description:
+    'Create a document to share with the user. Include the complete content in the `content` parameter. Use this for substantial content like articles, code, analysis, or structured data. Specify the title, kind (text, code, sheet, or image), and content.',
+  schema: createDocumentSchema,
+  execute: args => executeCreateDocument(args as CreateDocumentArgs),
+  formatResult: (raw): ToolResult => {
+    const result = raw as { id: string; title: string; kind: string; content: string };
+    const { content: _content, ...metadata } = result;
+    return { content: [{ type: 'text', text: JSON.stringify(metadata) }], details: result };
+  },
+};
+
+export { createDocumentToolDef };

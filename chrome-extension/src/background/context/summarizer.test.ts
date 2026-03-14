@@ -55,7 +55,10 @@ User asked about the weather in SF.
 None
 
 ### 6. TOOL FAILURES & FILE OPERATIONS
-None`;
+None
+
+### 7. CURRENT TASK STATE
+No active task.`;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -134,7 +137,7 @@ describe('summarizeMessages', () => {
 
     expect(mockCompleteText).toHaveBeenCalled();
     const opts = mockCompleteText.mock.calls[0]![3];
-    expect(opts.maxTokens).toBe(800);
+    expect(opts.maxTokens).toBe(1200);
   });
 
   it('includes tool-call parts in transcript', async () => {

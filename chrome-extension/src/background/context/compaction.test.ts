@@ -169,7 +169,10 @@ describe('compactMessages', () => {
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'Latest question' }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest question' }] }),
     ];
     const result = compactMessages(messages, 'gpt-4o');
     expect(result.wasCompacted).toBe(true);
@@ -270,7 +273,11 @@ describe('compactMessages', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: text }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: text }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: text }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: text }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: text }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: text }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
     const resultSmall = compactMessages(messages, 'gpt-4o');
     const resultLarge = compactMessages(messages, 'gemini-2.0-flash');
@@ -345,7 +352,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig);
@@ -361,7 +372,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig);
@@ -382,7 +397,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig);
@@ -398,7 +417,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig);
@@ -413,7 +436,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'First question' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig);
@@ -422,7 +449,7 @@ describe('compactMessagesWithSummary', () => {
       expect(result.messages[0]!.id).toBe('m1');
       // Last message should be the most recent
       const lastMsg = result.messages[result.messages.length - 1]!;
-      expect(lastMsg.id).toBe('m4');
+      expect(lastMsg.id).toBe('m8');
     }
   });
 
@@ -485,7 +512,11 @@ describe('compactMessagesWithSummary', () => {
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig, {
@@ -837,13 +868,20 @@ describe('compactMessages — TOKEN_SAFETY_MARGIN', () => {
     // So totalTokens must be in (budget/1.2, budget]
     const targetTokens = Math.floor(effectiveLimit / TOKEN_SAFETY_MARGIN) + 100;
     // Each char ≈ 0.25 tokens, so chars = tokens * 4
-    // 3 messages × 4 overhead each = 12 tokens overhead; put bulk in m2
-    const textLen = (targetTokens - 12) * 4;
+    // 9 messages × 4 overhead each = 36 tokens overhead; spread bulk across middle messages
+    const bulkTokens = targetTokens - 36;
+    const perMsgLen = Math.floor((bulkTokens / 4) * 4); // 4 middle messages share the bulk
 
     const messages = [
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }),
-      makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'a'.repeat(textLen) }] }),
-      makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
+      makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'a'.repeat(perMsgLen) }] }),
+      makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'a'.repeat(perMsgLen) }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: 'a'.repeat(perMsgLen) }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'a'.repeat(perMsgLen) }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: 'Short' }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: 'Short' }] }),
+      makeMessage({ id: 'm8', role: 'assistant', parts: [{ type: 'text', text: 'Short' }] }),
+      makeMessage({ id: 'm9', role: 'user', parts: [{ type: 'text', text: 'Latest' }] }),
     ];
 
     const result = compactMessages(messages, 'gpt-4o');
@@ -1232,13 +1270,17 @@ describe('compactMessagesWithSummary — force mode', () => {
   it('compacts even when messages fit within budget', async () => {
     mockSummarize.mockResolvedValueOnce('Forced summary of conversation');
 
-    // Small messages that easily fit in budget
+    // Small messages that easily fit in budget — need enough to exceed anchor + MIN_RECENT_MESSAGES
     const messages = [
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'First question' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'First answer' }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'Second question' }] }),
       makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: 'Second answer' }] }),
       makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'Third question' }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: 'Third answer' }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: 'Fourth question' }] }),
+      makeMessage({ id: 'm8', role: 'assistant', parts: [{ type: 'text', text: 'Fourth answer' }] }),
+      makeMessage({ id: 'm9', role: 'user', parts: [{ type: 'text', text: 'Fifth question' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig, {
@@ -1262,6 +1304,10 @@ describe('compactMessagesWithSummary — force mode', () => {
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'Second' }] }),
       makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: 'Reply 2' }] }),
       makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'Third' }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: 'Reply 3' }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: 'Fourth' }] }),
+      makeMessage({ id: 'm8', role: 'assistant', parts: [{ type: 'text', text: 'Reply 4' }] }),
+      makeMessage({ id: 'm9', role: 'user', parts: [{ type: 'text', text: 'Fifth' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'gpt-4o', mockModelConfig, {
@@ -1295,6 +1341,10 @@ describe('compactMessagesWithSummary — transcript repair integration', () => {
       makeMessage({ id: 'm3', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
       makeMessage({ id: 'm4', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
       makeMessage({ id: 'm5', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
+      makeMessage({ id: 'm6', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
+      makeMessage({ id: 'm7', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
+      makeMessage({ id: 'm8', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
+      makeMessage({ id: 'm9', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(10000) }] }),
     ];
 
     // Use force mode to trigger summarization even if under budget
@@ -1331,7 +1381,11 @@ describe('compactMessagesWithSummary — timeout fallback', () => {
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
       makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
-      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'latest question' }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
+      makeMessage({ id: 'm8', role: 'assistant', parts: [{ type: 'text', text: 'x'.repeat(50000) }] }),
+      makeMessage({ id: 'm9', role: 'user', parts: [{ type: 'text', text: 'latest question' }] }),
     ];
 
     const result = await compactMessagesWithSummary(messages, 'test-model', mockModelConfig, {
@@ -1389,7 +1443,11 @@ describe('compactMessagesWithSummary — configurable settings', () => {
     const messages = [
       makeMessage({ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Start' }] }),
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: largeAssistant }] }),
-      makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'End' }] }),
+      makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: 'Middle question' }] }),
+      makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: 'Middle answer' }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'Another question' }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: 'Another answer' }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: 'End' }] }),
     ];
 
     // With a very low maxHistoryShare (0.1), the large message should be truncated more aggressively
@@ -1444,7 +1502,11 @@ describe('compactMessages — diagnostic fields', () => {
       makeMessage({ id: 'm2', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm3', role: 'user', parts: [{ type: 'text', text: longText }] }),
       makeMessage({ id: 'm4', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
-      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: 'Latest question' }] }),
+      makeMessage({ id: 'm5', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm6', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm7', role: 'user', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm8', role: 'assistant', parts: [{ type: 'text', text: longText }] }),
+      makeMessage({ id: 'm9', role: 'user', parts: [{ type: 'text', text: 'Latest question' }] }),
     ];
     const result = compactMessages(messages, 'gpt-4o');
     expect(result.wasCompacted).toBe(true);

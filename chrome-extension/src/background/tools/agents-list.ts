@@ -23,3 +23,17 @@ const executeAgentsList = async (): Promise<string> => {
 };
 
 export { agentsListSchema, executeAgentsList };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const agentsListToolDef: ToolRegistration = {
+  name: 'agents_list',
+  label: 'List Agents',
+  description: 'List available agents with their IDs, names, and active status.',
+  schema: agentsListSchema,
+  excludeInHeadless: true,
+  execute: () => executeAgentsList(),
+};
+
+export { agentsListToolDef };

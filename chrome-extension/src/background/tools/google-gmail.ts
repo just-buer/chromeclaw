@@ -283,3 +283,47 @@ export {
   decodeBase64Url,
 };
 export type { GmailSearchArgs, GmailReadArgs, GmailSendArgs, GmailDraftArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+import { jsonFormatResult } from './tool-registration';
+
+const gmailToolDefs: ToolRegistration[] = [
+  {
+    name: 'gmail_search',
+    label: 'Gmail Search',
+    description:
+      'Search Gmail for emails. Supports Gmail search syntax (e.g. "is:unread", "from:alice@example.com", "newer_than:7d"). Returns message ID, from, to, subject, snippet, and date.',
+    schema: gmailSearchSchema,
+    execute: args => executeGmailSearch(args as GmailSearchArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'gmail_read',
+    label: 'Gmail Read',
+    description:
+      'Read the full content of a Gmail email by message ID. Returns parsed headers and plain text body.',
+    schema: gmailReadSchema,
+    execute: args => executeGmailRead(args as GmailReadArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'gmail_send',
+    label: 'Gmail Send',
+    description: 'Send an email via Gmail. Requires to, subject, and body. Optional cc and bcc.',
+    schema: gmailSendSchema,
+    execute: args => executeGmailSend(args as GmailSendArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'gmail_draft',
+    label: 'Gmail Draft',
+    description:
+      'Create a draft email in Gmail. Same parameters as sending but saves as draft instead.',
+    schema: gmailDraftSchema,
+    execute: args => executeGmailDraft(args as GmailDraftArgs),
+    formatResult: jsonFormatResult,
+  },
+];
+
+export { gmailToolDefs };

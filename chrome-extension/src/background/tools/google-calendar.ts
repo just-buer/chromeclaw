@@ -226,3 +226,47 @@ export {
   formatEvent,
 };
 export type { CalendarListArgs, CalendarCreateArgs, CalendarUpdateArgs, CalendarDeleteArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+import { jsonFormatResult } from './tool-registration';
+
+const calendarToolDefs: ToolRegistration[] = [
+  {
+    name: 'calendar_list',
+    label: 'Calendar List',
+    description:
+      'List Google Calendar events within a time range. Returns summary, start/end times, location, attendees, and description.',
+    schema: calendarListSchema,
+    execute: args => executeCalendarList(args as CalendarListArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'calendar_create',
+    label: 'Calendar Create',
+    description:
+      'Create a Google Calendar event. Requires summary, startTime, and endTime in ISO 8601 format.',
+    schema: calendarCreateSchema,
+    execute: args => executeCalendarCreate(args as CalendarCreateArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'calendar_update',
+    label: 'Calendar Update',
+    description:
+      'Update an existing Google Calendar event. Requires eventId plus any fields to change.',
+    schema: calendarUpdateSchema,
+    execute: args => executeCalendarUpdate(args as CalendarUpdateArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'calendar_delete',
+    label: 'Calendar Delete',
+    description: 'Delete a Google Calendar event by event ID.',
+    schema: calendarDeleteSchema,
+    execute: args => executeCalendarDelete(args as CalendarDeleteArgs),
+    formatResult: jsonFormatResult,
+  },
+];
+
+export { calendarToolDefs };

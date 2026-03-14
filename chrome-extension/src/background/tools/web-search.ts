@@ -471,3 +471,19 @@ export {
   SEARCH_CACHE,
 };
 export type { WebSearchArgs, SearchResult };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+import { jsonFormatResult } from './tool-registration';
+
+const webSearchToolDef: ToolRegistration = {
+  name: 'web_search',
+  label: 'Web Search',
+  description:
+    'Search the web for current information using the configured search provider (Tavily API or browser-based search). Use this when the user asks about recent events, news, or information that may not be in your training data.',
+  schema: webSearchSchema,
+  execute: args => executeWebSearch(args as WebSearchArgs),
+  formatResult: jsonFormatResult,
+};
+
+export { webSearchToolDef };

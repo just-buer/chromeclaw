@@ -997,3 +997,30 @@ export type {
   ConsoleEntry,
   NetworkEntry,
 };
+
+// ── Tool registration ──
+import type { ToolRegistration, ToolResult } from './tool-registration';
+
+const browserToolDef: ToolRegistration = {
+  name: 'browser',
+  label: 'Browser',
+  description:
+    'Control browser tabs: list/open/close/focus tabs, navigate to URLs, take DOM snapshots with numbered element refs, take screenshots, click or type on elements by ref, evaluate JavaScript, and view console logs or network requests. Use "snapshot" to understand page content, then "click"/"type" with ref numbers to interact.',
+  schema: browserSchema,
+  execute: args => executeBrowser(args as BrowserArgs),
+  formatResult: (raw): ToolResult => {
+    if (typeof raw === 'object' && (raw as ScreenshotResult).__type === 'screenshot') {
+      const ss = raw as ScreenshotResult;
+      return {
+        content: [
+          { type: 'text', text: `Screenshot captured (${ss.width}\u00d7${ss.height})` },
+          { type: 'image', data: ss.base64, mimeType: ss.mimeType },
+        ],
+        details: { width: ss.width, height: ss.height },
+      };
+    }
+    return { content: [{ type: 'text', text: raw as string }], details: { output: raw } };
+  },
+};
+
+export { browserToolDef };

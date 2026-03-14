@@ -78,3 +78,27 @@ const executeMemoryGet = async (args: MemoryGetArgs): Promise<string> => {
 };
 
 export { memorySearchSchema, memoryGetSchema, executeMemorySearch, executeMemoryGet };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const memoryToolDefs: ToolRegistration[] = [
+  {
+    name: 'memory_search',
+    label: 'Memory Search',
+    description:
+      'Search memory files using keyword matching (BM25). Returns ranked results with file paths, line ranges, and snippets. Use this to recall prior work, decisions, preferences, or stored knowledge.',
+    schema: memorySearchSchema,
+    execute: args => executeMemorySearch(args as any),
+  },
+  {
+    name: 'memory_get',
+    label: 'Memory Get',
+    description:
+      'Read specific lines from a memory or workspace file. Use this after memory_search to get full context around a search result.',
+    schema: memoryGetSchema,
+    execute: args => executeMemoryGet(args as any),
+  },
+];
+
+export { memoryToolDefs };

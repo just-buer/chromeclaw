@@ -216,3 +216,39 @@ export {
   MAX_DOWNLOAD_SIZE,
 };
 export type { DriveSearchArgs, DriveReadArgs, DriveCreateArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+import { jsonFormatResult } from './tool-registration';
+
+const driveToolDefs: ToolRegistration[] = [
+  {
+    name: 'drive_search',
+    label: 'Drive Search',
+    description:
+      'Search Google Drive for files. Supports Drive search syntax. Returns file ID, name, mimeType, modifiedTime, size, and webViewLink.',
+    schema: driveSearchSchema,
+    execute: args => executeDriveSearch(args as DriveSearchArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'drive_read',
+    label: 'Drive Read',
+    description:
+      'Read content from a Google Drive file. For Google Docs/Sheets/Slides, exports as plain text. For other files, downloads content (with size limit).',
+    schema: driveReadSchema,
+    execute: args => executeDriveRead(args as DriveReadArgs),
+    formatResult: jsonFormatResult,
+  },
+  {
+    name: 'drive_create',
+    label: 'Drive Create',
+    description:
+      'Create a new file in Google Drive. Requires name and content. Optional mimeType and folderId.',
+    schema: driveCreateSchema,
+    execute: args => executeDriveCreate(args as DriveCreateArgs),
+    formatResult: jsonFormatResult,
+  },
+];
+
+export { driveToolDefs };

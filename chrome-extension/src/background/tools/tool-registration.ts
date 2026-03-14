@@ -1,33 +1,64 @@
 /**
  * Background-only tool registration types.
  *
- * Each tool file exports a `ToolImplRegistration` that pairs its configKey
- * with the tool entries (schema + execute). The central registry collects
- * these and the tools/index.ts iterates them.
+ * Each tool file exports a `ToolRegistration` (or array of them) that pairs
+ * the tool's metadata (name, label, description, schema) with its executor.
+ * The central registry in tools/index.ts collects these and builds AgentTool[].
  */
+
+import type { TObject } from '@sinclair/typebox';
 
 interface ToolContext {
   chatId?: string;
 }
 
-interface ToolEntry {
-  /** LLM-facing tool name, e.g. 'web_search', 'create_document' */
+/**
+ * Result returned by formatResult. Uses `any` for content items because
+ * different tools return different shapes (TextContent, ImageContent, or
+ * custom objects like base64 source blocks). The AgentToolResult generic
+ * from pi-agent-core accepts these at runtime.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface ToolResult {
+  content: any[];
+  details: unknown;
+}
+
+interface ToolRegistration {
+  /** LLM-facing tool name, e.g. 'web_search' */
   name: string;
+  /** Human-readable label shown in UI */
+  label: string;
   /** Tool description shown to the LLM */
   description: string;
-  /** Input schema (TypeBox TSchema or compatible) */
-  inputSchema: unknown;
-  /** Execute function */
-  execute: (args: unknown, context?: ToolContext) => Promise<unknown>;
-  /** Exclude this tool when the given condition is active, e.g. 'headless' */
-  excludeWhen?: string;
+  /** TypeBox input schema */
+  schema: TObject;
+  /** If true, this tool is excluded when running in headless mode */
+  excludeInHeadless?: boolean;
+  /** If true, executor receives { chatId } context */
+  needsContext?: boolean;
+  /** Raw executor: (args, context?) → result */
+  execute: (args: any, context?: ToolContext) => Promise<unknown>;
+  /**
+   * Format raw executor result into content blocks for the LLM.
+   * When omitted, the default formatter is used:
+   * - string → { type: 'text', text: result }
+   * - other  → { type: 'text', text: JSON.stringify(result) }
+   */
+  formatResult?: (result: unknown) => ToolResult;
 }
 
-interface ToolImplRegistration {
-  /** Matches ToolGroupMeta.groupKey (for organizational reference only) */
-  configKey: string;
-  /** Tool entries in this group */
-  tools: ToolEntry[];
-}
+/** Default result formatter: stringify to text content block */
+const defaultFormatResult = (result: unknown): ToolResult => {
+  const text = typeof result === 'string' ? result : JSON.stringify(result);
+  return { content: [{ type: 'text', text }], details: { output: result } };
+};
 
-export type { ToolContext, ToolEntry, ToolImplRegistration };
+/** JSON result formatter: stringify to text, details = raw result (for API tools) */
+const jsonFormatResult = (result: unknown): ToolResult => ({
+  content: [{ type: 'text', text: JSON.stringify(result) }],
+  details: result,
+});
+
+export { defaultFormatResult, jsonFormatResult };
+export type { ToolContext, ToolRegistration, ToolResult };

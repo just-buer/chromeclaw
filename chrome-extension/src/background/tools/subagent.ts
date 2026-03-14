@@ -502,3 +502,37 @@ export {
   registry,
 };
 export type { SpawnSubagentOptions };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const subagentToolDefs: ToolRegistration[] = [
+  {
+    name: 'spawn_subagent',
+    label: 'Spawn Subagent',
+    description:
+      'Spawn a background subagent to work on a task asynchronously. Returns immediately — the subagent runs in the background and its results will appear as a system message in the chat when complete. Do NOT poll with list_subagents after spawning. Use for complex tasks that need multiple tool calls.',
+    schema: spawnSubagentSchema,
+    excludeInHeadless: true,
+    needsContext: true,
+    execute: (args, context) => executeSpawnSubagent(args as any, { chatId: context?.chatId }),
+  },
+  {
+    name: 'list_subagents',
+    label: 'List Subagents',
+    description: 'List active and recent subagent runs with their status, task, and duration.',
+    schema: listSubagentsSchema,
+    excludeInHeadless: true,
+    execute: () => executeListSubagents(),
+  },
+  {
+    name: 'kill_subagent',
+    label: 'Kill Subagent',
+    description: 'Cancel a running subagent by its run ID.',
+    schema: killSubagentSchema,
+    excludeInHeadless: true,
+    execute: args => executeKillSubagent(args as any),
+  },
+];
+
+export { subagentToolDefs };

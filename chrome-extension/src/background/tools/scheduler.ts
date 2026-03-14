@@ -302,3 +302,19 @@ const executeScheduler = async (
 
 export { schedulerSchema, executeScheduler, setCronServiceRef };
 export type { SchedulerArgs };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const schedulerToolDef: ToolRegistration = {
+  name: 'scheduler',
+  label: 'Scheduler',
+  description:
+    'Manage scheduled and recurring tasks. Actions: status, list, add (create task), update (modify task), remove (delete task), run (force-run now), runs (view history). Use this when the user asks to schedule, remind, or automate something.',
+  schema: schedulerSchema,
+  excludeInHeadless: true,
+  needsContext: true,
+  execute: (args, context) => executeScheduler(args as SchedulerArgs, context),
+};
+
+export { schedulerToolDef };

@@ -19,10 +19,14 @@ const CHARS_PER_TOKEN = 4;
 // ── Base64 detection and stripping ────────────────────────
 
 /** Match JSON-wrapped base64 image data (e.g. {"base64":"...","mimeType":"image/png"}) */
-const BASE64_JSON_RE = /("(?:base64|data|image)":\s*")[A-Za-z0-9+/=]{1000,}(")/g;
+const BASE64_JSON_RE = /("(?:base64|data|image|imageData)":\s*")[A-Za-z0-9+/=]{1000,}(")/g;
 
 /** Match data URLs with base64 content */
 const DATA_URL_BASE64_RE = /(data:image\/[^;]+;base64,)[A-Za-z0-9+/=]{1000,}/g;
+
+/** Match long standalone base64 blobs in JSON string values (e.g. CDP Runtime.evaluate results).
+ * Uses 8000-char minimum to avoid false positives on minified JS, long hex strings, or JWTs. */
+const STANDALONE_BASE64_RE = /("[^"]{0,50}"\s*:\s*")[A-Za-z0-9+/]{8000,}={0,2}(")/g;
 
 /**
  * Strip base64 image data from tool result text, replacing with a placeholder.
@@ -38,6 +42,11 @@ const stripBase64FromText = (text: string): string => {
   result = result.replace(
     DATA_URL_BASE64_RE,
     (_match, prefix: string) => `${prefix}[image data removed]`,
+  );
+  // Strip long standalone base64 blobs (e.g. CDP debugger responses with image data in JSON values)
+  result = result.replace(
+    STANDALONE_BASE64_RE,
+    (_match, prefix: string, suffix: string) => `${prefix}[base64 data removed]${suffix}`,
   );
   return result;
 };

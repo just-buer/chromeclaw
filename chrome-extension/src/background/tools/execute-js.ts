@@ -579,3 +579,21 @@ export {
   stripLeadingComments,
   _resetSandbox,
 };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const executeJsToolDef: ToolRegistration = {
+  name: 'execute_javascript',
+  label: 'Execute Javascript',
+  description:
+    'Execute JavaScript code in a sandboxed browser tab (or a specific tab via tabId), ' +
+    'bundle and run multiple workspace files, or register/unregister workspace files as custom tools. ' +
+    'Actions: execute (run JS code or a workspace file), bundle (load multiple files as modules), ' +
+    'register (parse tool metadata and save), unregister (remove a custom tool). ' +
+    'Supports configurable timeout, module registry (exportAs), and console output capture.',
+  schema: executeJsSchema,
+  execute: args => executeJs(args as any),
+};
+
+export { executeJsToolDef };

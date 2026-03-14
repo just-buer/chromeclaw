@@ -206,3 +206,57 @@ export {
   executeDelete,
   executeRename,
 };
+
+// ── Tool registration ──
+import type { ToolRegistration } from './tool-registration';
+
+const workspaceToolDefs: ToolRegistration[] = [
+  {
+    name: 'write',
+    label: 'Write',
+    description:
+      'Write content to a workspace file. Use this to save notes, memories, or context for future sessions (e.g. memory/notes.md, notes/project.md).',
+    schema: writeSchema,
+    execute: args => executeWrite(args as any),
+  },
+  {
+    name: 'read',
+    label: 'Read',
+    description:
+      'Read a workspace file by name. Use this to retrieve workspace context, user preferences, or previously saved notes.',
+    schema: readSchema,
+    execute: args => executeRead(args as any),
+  },
+  {
+    name: 'edit',
+    label: 'Edit',
+    description:
+      'Edit a workspace file with find-and-replace. Finds an exact unique match of oldText and replaces it with newText.',
+    schema: editSchema,
+    execute: args => executeEdit(args as any),
+  },
+  {
+    name: 'list',
+    label: 'List',
+    description: 'List all workspace files with their names, owners, and enabled status.',
+    schema: listSchema,
+    execute: () => executeList(),
+  },
+  {
+    name: 'delete',
+    label: 'Delete',
+    description:
+      'Delete a workspace file by path. Cannot delete predefined system files.',
+    schema: deleteSchema,
+    execute: args => executeDelete(args as any),
+  },
+  {
+    name: 'rename',
+    label: 'Rename',
+    description: 'Rename/move a workspace file to a new path.',
+    schema: renameSchema,
+    execute: args => executeRename(args as any),
+  },
+];
+
+export { workspaceToolDefs };

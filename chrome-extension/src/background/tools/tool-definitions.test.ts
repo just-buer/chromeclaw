@@ -73,115 +73,262 @@ vi.mock('@extension/storage', () => ({
 }));
 
 // ── Mock tool executors ──
-vi.mock('./web-search', () => ({
-  webSearchSchema: {},
-  executeWebSearch: vi.fn(() => Promise.resolve({ results: [] })),
-}));
 
-vi.mock('./documents', () => ({
-  createDocumentSchema: {},
-  executeCreateDocument: vi.fn(() =>
+// Helper to build minimal ToolRegistration mocks
+const mockToolDef = (name: string, schema: object, execute: (...args: any[]) => any) => ({
+  name,
+  label: name,
+  description: `Mock ${name}`,
+  schema,
+  execute,
+});
+
+vi.mock('./tool-registration', () => {
+  const jsonFormatResult = (result: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    details: result,
+  });
+  return {
+    defaultFormatResult: (result: unknown) => {
+      const text = typeof result === 'string' ? result : JSON.stringify(result);
+      return { content: [{ type: 'text', text }], details: { output: result } };
+    },
+    jsonFormatResult,
+  };
+});
+
+vi.mock('./web-search', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve({ results: [] }));
+  const jsonFmt = (result: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    details: result,
+  });
+  return {
+    webSearchSchema: schema,
+    executeWebSearch: execute,
+    webSearchToolDef: { ...mockToolDef('web_search', schema, execute), formatResult: jsonFmt },
+  };
+});
+
+vi.mock('./documents', () => {
+  const schema = {};
+  const execute = vi.fn(() =>
     Promise.resolve({ id: 'doc-1', title: 'Test', kind: 'text', content: 'Hello world' }),
-  ),
-}));
+  );
+  return {
+    createDocumentSchema: schema,
+    executeCreateDocument: execute,
+    createDocumentToolDef: mockToolDef('create_document', schema, execute),
+  };
+});
 
-vi.mock('./workspace', () => ({
-  writeSchema: {},
-  executeWrite: vi.fn(() => Promise.resolve({ success: true })),
-  readSchema: {},
-  executeRead: vi.fn(() => Promise.resolve({ content: 'hello' })),
-  editSchema: {},
-  executeEdit: vi.fn(() => Promise.resolve('Edited file.md (100 chars)')),
-  listSchema: {},
-  executeList: vi.fn(() => Promise.resolve([])),
-  deleteSchema: {},
-  executeDelete: vi.fn(() => Promise.resolve('Deleted test.md')),
-  renameSchema: {},
-  executeRename: vi.fn(() => Promise.resolve('Renamed old.md → new.md')),
-}));
+vi.mock('./workspace', () => {
+  const writeSchema = {};
+  const executeWrite = vi.fn(() => Promise.resolve({ success: true }));
+  const readSchema = {};
+  const executeRead = vi.fn(() => Promise.resolve({ content: 'hello' }));
+  const editSchema = {};
+  const executeEdit = vi.fn(() => Promise.resolve('Edited file.md (100 chars)'));
+  const listSchema = {};
+  const executeList = vi.fn(() => Promise.resolve([]));
+  const deleteSchema = {};
+  const executeDelete = vi.fn(() => Promise.resolve('Deleted test.md'));
+  const renameSchema = {};
+  const executeRename = vi.fn(() => Promise.resolve('Renamed old.md → new.md'));
+  return {
+    writeSchema, executeWrite,
+    readSchema, executeRead,
+    editSchema, executeEdit,
+    listSchema, executeList,
+    deleteSchema, executeDelete,
+    renameSchema, executeRename,
+    workspaceToolDefs: [
+      mockToolDef('write', writeSchema, executeWrite),
+      mockToolDef('read', readSchema, executeRead),
+      mockToolDef('edit', editSchema, executeEdit),
+      mockToolDef('list', listSchema, executeList),
+      mockToolDef('delete', deleteSchema, executeDelete),
+      mockToolDef('rename', renameSchema, executeRename),
+    ],
+  };
+});
 
-vi.mock('./memory-tools', () => ({
-  memorySearchSchema: {},
-  executeMemorySearch: vi.fn(() => Promise.resolve({ results: [] })),
-  memoryGetSchema: {},
-  executeMemoryGet: vi.fn(() => Promise.resolve({ content: '' })),
-}));
+vi.mock('./memory-tools', () => {
+  const memorySearchSchema = {};
+  const executeMemorySearch = vi.fn(() => Promise.resolve({ results: [] }));
+  const memoryGetSchema = {};
+  const executeMemoryGet = vi.fn(() => Promise.resolve({ content: '' }));
+  return {
+    memorySearchSchema, executeMemorySearch,
+    memoryGetSchema, executeMemoryGet,
+    memoryToolDefs: [
+      mockToolDef('memory_search', memorySearchSchema, executeMemorySearch),
+      mockToolDef('memory_get', memoryGetSchema, executeMemoryGet),
+    ],
+  };
+});
 
-vi.mock('./browser', () => ({
-  browserSchema: {},
-  executeBrowser: vi.fn(() => Promise.resolve({ status: 'ok' })),
-}));
+vi.mock('./browser', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve({ status: 'ok' }));
+  return {
+    browserSchema: schema,
+    executeBrowser: execute,
+    browserToolDef: mockToolDef('browser', schema, execute),
+  };
+});
 
-vi.mock('./scheduler', () => ({
-  schedulerSchema: {},
-  executeScheduler: vi.fn(() => Promise.resolve({ ok: true })),
-}));
+vi.mock('./scheduler', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve({ ok: true }));
+  return {
+    schedulerSchema: schema,
+    executeScheduler: execute,
+    schedulerToolDef: { ...mockToolDef('scheduler', schema, execute), excludeInHeadless: true, needsContext: true },
+  };
+});
 
-vi.mock('./web-fetch', () => ({
-  webFetchSchema: {},
-  executeWebFetch: vi.fn(() => Promise.resolve({ text: 'content', title: 'Title', status: 200 })),
-}));
+vi.mock('./web-fetch', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve({ text: 'content', title: 'Title', status: 200 }));
+  return {
+    webFetchSchema: schema,
+    executeWebFetch: execute,
+    webFetchToolDef: mockToolDef('web_fetch', schema, execute),
+  };
+});
 
-vi.mock('./deep-research', () => ({
-  deepResearchSchema: {},
-  executeDeepResearch: vi.fn(() => Promise.resolve('{}')),
-}));
+vi.mock('./deep-research', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve('{}'));
+  return {
+    deepResearchSchema: schema,
+    executeDeepResearch: execute,
+    deepResearchToolDef: { ...mockToolDef('deep_research', schema, execute), excludeInHeadless: true, needsContext: true },
+  };
+});
 
-vi.mock('./agents-list', () => ({
-  agentsListSchema: {},
-  executeAgentsList: vi.fn(() => Promise.resolve('agents list result')),
-}));
+vi.mock('./agents-list', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve('agents list result'));
+  return {
+    agentsListSchema: schema,
+    executeAgentsList: execute,
+    agentsListToolDef: { ...mockToolDef('agents_list', schema, execute), excludeInHeadless: true },
+  };
+});
 
-vi.mock('./execute-js', () => ({
-  executeJsSchema: {},
-  executeJs: vi.fn(() => Promise.resolve('result')),
-  executeCustomTool: vi.fn(() => Promise.resolve('custom result')),
-}));
+vi.mock('./execute-js', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve('result'));
+  return {
+    executeJsSchema: schema,
+    executeJs: execute,
+    executeCustomTool: vi.fn(() => Promise.resolve('custom result')),
+    executeJsToolDef: mockToolDef('execute_javascript', schema, execute),
+  };
+});
 
-vi.mock('./subagent', () => ({
-  spawnSubagentSchema: {},
-  listSubagentsSchema: {},
-  killSubagentSchema: {},
-  executeSpawnSubagent: vi.fn(() => Promise.resolve('{}')),
-  executeListSubagents: vi.fn(() => Promise.resolve('{"count":0,"runs":[]}')),
-  executeKillSubagent: vi.fn(() => Promise.resolve('{"status":"ok"}')),
-}));
+vi.mock('./subagent', () => {
+  const spawnSubagentSchema = {};
+  const listSubagentsSchema = {};
+  const killSubagentSchema = {};
+  const executeSpawnSubagent = vi.fn(() => Promise.resolve('{}'));
+  const executeListSubagents = vi.fn(() => Promise.resolve('{"count":0,"runs":[]}'));
+  const executeKillSubagent = vi.fn(() => Promise.resolve('{"status":"ok"}'));
+  return {
+    spawnSubagentSchema, listSubagentsSchema, killSubagentSchema,
+    executeSpawnSubagent, executeListSubagents, executeKillSubagent,
+    subagentToolDefs: [
+      { ...mockToolDef('spawn_subagent', spawnSubagentSchema, executeSpawnSubagent), excludeInHeadless: true, needsContext: true },
+      { ...mockToolDef('list_subagents', listSubagentsSchema, executeListSubagents), excludeInHeadless: true },
+      { ...mockToolDef('kill_subagent', killSubagentSchema, executeKillSubagent), excludeInHeadless: true },
+    ],
+  };
+});
 
-vi.mock('./google-gmail', () => ({
-  gmailSearchSchema: {},
-  gmailReadSchema: {},
-  gmailSendSchema: {},
-  gmailDraftSchema: {},
-  executeGmailSearch: vi.fn(() => Promise.resolve({ messages: [], totalEstimate: 0 })),
-  executeGmailRead: vi.fn(() => Promise.resolve({ id: 'msg1', body: '' })),
-  executeGmailSend: vi.fn(() => Promise.resolve({ id: 'sent1', status: 'sent' })),
-  executeGmailDraft: vi.fn(() => Promise.resolve({ draftId: 'd1', status: 'draft_created' })),
-}));
+vi.mock('./google-gmail', () => {
+  const gmailSearchSchema = {};
+  const gmailReadSchema = {};
+  const gmailSendSchema = {};
+  const gmailDraftSchema = {};
+  const executeGmailSearch = vi.fn(() => Promise.resolve({ messages: [], totalEstimate: 0 }));
+  const executeGmailRead = vi.fn(() => Promise.resolve({ id: 'msg1', body: '' }));
+  const executeGmailSend = vi.fn(() => Promise.resolve({ id: 'sent1', status: 'sent' }));
+  const executeGmailDraft = vi.fn(() => Promise.resolve({ draftId: 'd1', status: 'draft_created' }));
+  const jsonFmt = (result: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    details: result,
+  });
+  return {
+    gmailSearchSchema, gmailReadSchema, gmailSendSchema, gmailDraftSchema,
+    executeGmailSearch, executeGmailRead, executeGmailSend, executeGmailDraft,
+    gmailToolDefs: [
+      { ...mockToolDef('gmail_search', gmailSearchSchema, executeGmailSearch), formatResult: jsonFmt },
+      { ...mockToolDef('gmail_read', gmailReadSchema, executeGmailRead), formatResult: jsonFmt },
+      { ...mockToolDef('gmail_send', gmailSendSchema, executeGmailSend), formatResult: jsonFmt },
+      { ...mockToolDef('gmail_draft', gmailDraftSchema, executeGmailDraft), formatResult: jsonFmt },
+    ],
+  };
+});
 
-vi.mock('./google-calendar', () => ({
-  calendarListSchema: {},
-  calendarCreateSchema: {},
-  calendarUpdateSchema: {},
-  calendarDeleteSchema: {},
-  executeCalendarList: vi.fn(() => Promise.resolve({ events: [] })),
-  executeCalendarCreate: vi.fn(() => Promise.resolve({ id: 'evt1', status: 'created' })),
-  executeCalendarUpdate: vi.fn(() => Promise.resolve({ id: 'evt1', status: 'updated' })),
-  executeCalendarDelete: vi.fn(() => Promise.resolve({ eventId: 'evt1', status: 'deleted' })),
-}));
+vi.mock('./google-calendar', () => {
+  const calendarListSchema = {};
+  const calendarCreateSchema = {};
+  const calendarUpdateSchema = {};
+  const calendarDeleteSchema = {};
+  const executeCalendarList = vi.fn(() => Promise.resolve({ events: [] }));
+  const executeCalendarCreate = vi.fn(() => Promise.resolve({ id: 'evt1', status: 'created' }));
+  const executeCalendarUpdate = vi.fn(() => Promise.resolve({ id: 'evt1', status: 'updated' }));
+  const executeCalendarDelete = vi.fn(() => Promise.resolve({ eventId: 'evt1', status: 'deleted' }));
+  const jsonFmt = (result: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    details: result,
+  });
+  return {
+    calendarListSchema, calendarCreateSchema, calendarUpdateSchema, calendarDeleteSchema,
+    executeCalendarList, executeCalendarCreate, executeCalendarUpdate, executeCalendarDelete,
+    calendarToolDefs: [
+      { ...mockToolDef('calendar_list', calendarListSchema, executeCalendarList), formatResult: jsonFmt },
+      { ...mockToolDef('calendar_create', calendarCreateSchema, executeCalendarCreate), formatResult: jsonFmt },
+      { ...mockToolDef('calendar_update', calendarUpdateSchema, executeCalendarUpdate), formatResult: jsonFmt },
+      { ...mockToolDef('calendar_delete', calendarDeleteSchema, executeCalendarDelete), formatResult: jsonFmt },
+    ],
+  };
+});
 
-vi.mock('./google-drive', () => ({
-  driveSearchSchema: {},
-  driveReadSchema: {},
-  driveCreateSchema: {},
-  executeDriveSearch: vi.fn(() => Promise.resolve({ files: [] })),
-  executeDriveRead: vi.fn(() => Promise.resolve({ id: 'f1', content: '' })),
-  executeDriveCreate: vi.fn(() => Promise.resolve({ id: 'f1', status: 'created' })),
-}));
+vi.mock('./google-drive', () => {
+  const driveSearchSchema = {};
+  const driveReadSchema = {};
+  const driveCreateSchema = {};
+  const executeDriveSearch = vi.fn(() => Promise.resolve({ files: [] }));
+  const executeDriveRead = vi.fn(() => Promise.resolve({ id: 'f1', content: '' }));
+  const executeDriveCreate = vi.fn(() => Promise.resolve({ id: 'f1', status: 'created' }));
+  const jsonFmt = (result: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    details: result,
+  });
+  return {
+    driveSearchSchema, driveReadSchema, driveCreateSchema,
+    executeDriveSearch, executeDriveRead, executeDriveCreate,
+    driveToolDefs: [
+      { ...mockToolDef('drive_search', driveSearchSchema, executeDriveSearch), formatResult: jsonFmt },
+      { ...mockToolDef('drive_read', driveReadSchema, executeDriveRead), formatResult: jsonFmt },
+      { ...mockToolDef('drive_create', driveCreateSchema, executeDriveCreate), formatResult: jsonFmt },
+    ],
+  };
+});
 
-vi.mock('./debugger', () => ({
-  debuggerSchema: {},
-  executeDebugger: vi.fn(() => Promise.resolve('debugger result')),
-}));
+vi.mock('./debugger', () => {
+  const schema = {};
+  const execute = vi.fn(() => Promise.resolve('debugger result'));
+  return {
+    debuggerSchema: schema,
+    executeDebugger: execute,
+    debuggerToolDef: mockToolDef('debugger', schema, execute),
+  };
+});
 
 // ── Mock tool-utils ──
 vi.mock('./tool-utils', () => ({

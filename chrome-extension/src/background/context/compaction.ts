@@ -21,7 +21,7 @@ const MAX_TOOL_RESULT_CONTEXT_SHARE = 0.3;
  * Even if these messages exceed the remaining budget, they are force-kept
  * to prevent the catastrophic `recentMessages: 0` scenario.
  */
-const MIN_RECENT_MESSAGES = 2;
+const MIN_RECENT_MESSAGES = 4;
 
 /**
  * Safety margin applied to token estimates before budget comparison.
@@ -35,7 +35,7 @@ const TOKEN_SAFETY_MARGIN = 1.25;
  * 100K chars ≈ 25-33K tokens — keeps a single result from exceeding
  * a quarter of most models' context windows.
  */
-const HARD_MAX_TOOL_RESULT_CHARS = 100_000;
+const HARD_MAX_TOOL_RESULT_CHARS = 50_000;
 
 /**
  * Maximum share of the context budget that historical messages (non-recent)
@@ -186,6 +186,18 @@ const compactOldestToolResults = (messages: ChatMessage[], budgetChars: number):
       }),
     };
   });
+};
+
+/**
+ * Find the index of the last user message, searching backward from `startFrom`.
+ * Used to anchor the recent-message window at a user turn boundary.
+ * Returns the index of the user message, or -1 if no user message found.
+ */
+const findLastUserMessageIndex = (messages: ChatMessage[], startFrom: number): number => {
+  for (let i = startFrom; i >= 0; i--) {
+    if (messages[i]!.role === 'user') return i;
+  }
+  return -1;
 };
 
 interface CompactionResult {
@@ -362,6 +374,17 @@ const compactMessagesCore = (
   result = enforceHardTokenLimit(result, modelId, systemPromptTokens, contextWindowOverride);
 
   const tokensAfter = result.reduce((sum, m) => sum + estimateMessageTokens(m), 0);
+
+  // Guard: if compaction made things worse (e.g. repair added synthetic messages),
+  // abort and return the original messages unchanged.
+  if (tokensAfter >= totalTokens) {
+    compactionLog.trace('compaction: sliding-window produced no savings, aborting', {
+      tokensBefore: totalTokens,
+      tokensAfter,
+    });
+    return { messages, wasCompacted: false };
+  }
+
   const messagesDropped = messages.length - result.length;
   const durationMs = Date.now() - startTime;
 
@@ -592,22 +615,35 @@ const compactMessagesWithSummary = async (
       const targetChars = historyShareCap * CHARS_PER_TOKEN_BUDGET;
       truncated[i] = truncateMessageToolResults(truncated[i]!, targetChars);
       messageSizes[i] = estimateMessageTokens(truncated[i]!);
-      break;
     }
   }
 
   // Fill from the end — but guarantee at least cfgMinRecentMessages
+  // AND ensure the last user turn boundary is always included (turn-boundary-aware preservation strategy).
+  // Max messages to force-keep from the last user turn boundary
+  const MAX_TURN_MESSAGES = 4;
+
   const recentMessages: ChatMessage[] = [];
   let splitIdx = truncated.length;
+
+  // Find the start of the last complete user turn so we can force-keep it
+  const lastUserTurnIdx = findLastUserMessageIndex(truncated, truncated.length - 1);
+
   for (let i = truncated.length - 1; i > anchorIdx; i--) {
     const size = messageSizes[i]!;
     const mustKeep = recentMessages.length < cfgMinRecentMessages;
+    // Also force-keep messages from the last user turn boundary onwards,
+    // but cap to a reasonable turn size (user + assistant + tool results)
+    // to prevent unbounded force-keeps when the last user message is far back.
+    const isInLastUserTurn = lastUserTurnIdx > anchorIdx
+      && i >= lastUserTurnIdx
+      && (truncated.length - lastUserTurnIdx) <= MAX_TURN_MESSAGES;
     if (size <= remainingBudget) {
       recentMessages.unshift(truncated[i]!);
       remainingBudget -= size;
       splitIdx = i;
-    } else if (mustKeep) {
-      // Force-keep even if over budget — prevents recentMessages: 0
+    } else if (mustKeep || isInLastUserTurn) {
+      // Force-keep: prevents losing the current user turn context
       recentMessages.unshift(truncated[i]!);
       remainingBudget -= size;
       splitIdx = i;
