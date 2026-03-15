@@ -1,10 +1,10 @@
+import { t, useT } from '@extension/i18n';
+import { toolRegistryMeta } from '@extension/shared';
 import {
   defaultWebSearchConfig,
   defaultDeepResearchConfig,
   toolConfigStorage,
 } from '@extension/storage';
-import { toolRegistryMeta } from '@extension/shared';
-import { t, useT } from '@extension/i18n';
 import {
   Card,
   CardContent,
@@ -40,14 +40,14 @@ import {
   WrenchIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { ToolGroupMeta } from '@extension/shared';
 import type {
   BrowserSearchEngine,
   DeepResearchConfig,
   ToolConfig as ToolConfigData,
   WebSearchProvider,
 } from '@extension/storage';
-import type { ToolGroupMeta } from '@extension/shared';
+import type { LucideIcon } from 'lucide-react';
 
 // ── Icon mapping ──
 
@@ -276,9 +276,9 @@ const GoogleSubConfig = ({
 
   const handleDisconnect = useCallback(async () => {
     try {
-      if (!customClientId) {
+      if (!customClientId && typeof chrome.identity?.getAuthToken === 'function') {
         const result = await chrome.identity.getAuthToken({ interactive: false });
-        if (result.token) {
+        if (result.token && typeof chrome.identity?.removeCachedAuthToken === 'function') {
           await chrome.identity.removeCachedAuthToken({ token: result.token });
         }
       }
@@ -292,6 +292,7 @@ const GoogleSubConfig = ({
   // Check if already connected on mount (only for default path — webAuthFlow tokens aren't persisted)
   useEffect(() => {
     if (customClientId) return; // webAuthFlow tokens aren't cached across page loads
+    if (typeof chrome.identity?.getAuthToken !== 'function') return; // Not available on Firefox
     chrome.identity
       .getAuthToken({ interactive: false })
       .then(result => {
@@ -311,9 +312,10 @@ const GoogleSubConfig = ({
   }, [customClientId, onConnectionChange]);
 
   // Get the redirect URI that must be registered in Google Cloud Console
-  const redirectUri = typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL
-    ? chrome.identity.getRedirectURL()
-    : '';
+  const redirectUri =
+    typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL
+      ? chrome.identity.getRedirectURL()
+      : '';
 
   return (
     <div className="grid gap-2 pl-4">
@@ -331,10 +333,10 @@ const GoogleSubConfig = ({
         {customClientId && redirectUri && (
           <div className="text-muted-foreground space-y-1 text-xs">
             <p>
-              Add this redirect URI to your Google Cloud Console OAuth client
-              (Credentials &rarr; OAuth 2.0 Client ID &rarr; Authorized redirect URIs):
+              Add this redirect URI to your Google Cloud Console OAuth client (Credentials &rarr;
+              OAuth 2.0 Client ID &rarr; Authorized redirect URIs):
             </p>
-            <code className="bg-muted block select-all rounded px-2 py-1 text-[11px] break-all">
+            <code className="bg-muted block select-all break-all rounded px-2 py-1 text-[11px]">
               {redirectUri}
             </code>
           </div>
@@ -568,9 +570,7 @@ const ToolConfig = () => {
               />
 
               {!isGoogleConnected && (
-                <p className="text-muted-foreground pl-4 text-xs">
-                  {t('tool_enableGoogleHint')}
-                </p>
+                <p className="text-muted-foreground pl-4 text-xs">{t('tool_enableGoogleHint')}</p>
               )}
 
               {toolRegistryMeta

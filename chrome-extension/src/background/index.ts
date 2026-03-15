@@ -1,4 +1,5 @@
 import 'webextension-polyfill';
+import { handleLLMStream } from './agents/stream-handler';
 import { initChannels, validateChannelAuth, toggleChannel } from './channels';
 import { saveChannelConfig, getChannelConfig, createDefaultChannelConfig } from './channels/config';
 import {
@@ -21,10 +22,15 @@ import {
   registerStreamPort,
 } from './logging/logger-buffer';
 import { runSessionJournal } from './memory/memory-journal';
-import { handleLLMStream } from './agents/stream-handler';
 import { setCronServiceRef } from './tools/scheduler';
+import { createKeepAliveManager } from './utils/keep-alive';
+import { initSidePanelBehavior } from '@extension/shared';
 import { getScheduledTask } from '@extension/storage';
 import type { LLMRequestMessage } from '@extension/shared';
+
+// ── Port Listener for LLM Streaming ───────────
+
+// ── Side Panel Behavior ────────────────────────
 
 // ── Loggers ─────────────────────────────────
 const cronLog = createLogger('cron');
@@ -52,30 +58,32 @@ setTimeout(() => {
 // which blocks <img> loads from chrome-extension:// pages.
 // This dynamic rule removes that header for image requests initiated by the extension.
 const CORP_STRIP_RULE_ID = 9999;
-chrome.declarativeNetRequest.updateDynamicRules({
-  removeRuleIds: [CORP_STRIP_RULE_ID],
-  addRules: [
-    {
-      id: CORP_STRIP_RULE_ID,
-      priority: 1,
-      action: {
-        type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-        responseHeaders: [
-          {
-            header: 'Cross-Origin-Resource-Policy',
-            operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE,
-          },
-        ],
+chrome.declarativeNetRequest
+  .updateDynamicRules({
+    removeRuleIds: [CORP_STRIP_RULE_ID],
+    addRules: [
+      {
+        id: CORP_STRIP_RULE_ID,
+        priority: 1,
+        action: {
+          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+          responseHeaders: [
+            {
+              header: 'Cross-Origin-Resource-Policy',
+              operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE,
+            },
+          ],
+        },
+        condition: {
+          resourceTypes: [chrome.declarativeNetRequest.ResourceType.IMAGE],
+          initiatorDomains: [chrome.runtime.id],
+        },
       },
-      condition: {
-        resourceTypes: [chrome.declarativeNetRequest.ResourceType.IMAGE],
-        initiatorDomains: [chrome.runtime.id],
-      },
-    },
-  ],
-}).catch(err => {
-  console.error('[corp-strip] Failed to register CORP header rule:', err);
-});
+    ],
+  })
+  .catch(err => {
+    console.error('[corp-strip] Failed to register CORP header rule:', err);
+  });
 
 // ── Message Handlers ───────────────────────────
 
@@ -259,8 +267,13 @@ const messageHandlers: Record<string, MessageHandler> = {
 
     slashCmdLog.trace('COMPACT_REQUEST received', { chatId, modelId: modelConfig.id });
 
-    const { getMessagesByChatId, getChat, updateCompactionSummary, incrementCompactionCount, getEnabledWorkspaceFiles } =
-      await import('@extension/storage');
+    const {
+      getMessagesByChatId,
+      getChat,
+      updateCompactionSummary,
+      incrementCompactionCount,
+      getEnabledWorkspaceFiles,
+    } = await import('@extension/storage');
     const { compactMessagesWithSummary } = await import('./context/compaction');
     const { enforceToolResultBudget } = await import('./context/tool-result-context-guard');
     const { extractCriticalRules } = await import('./context/summarizer');
@@ -281,7 +294,7 @@ const messageHandlers: Record<string, MessageHandler> = {
     const effectiveContextWindow =
       cachedLimit && modelConfig.contextWindow
         ? Math.min(cachedLimit, modelConfig.contextWindow)
-        : cachedLimit ?? modelConfig.contextWindow;
+        : (cachedLimit ?? modelConfig.contextWindow);
 
     slashCmdLog.trace('COMPACT_REQUEST: effective context window', {
       cachedLimit,
@@ -301,18 +314,13 @@ const messageHandlers: Record<string, MessageHandler> = {
       const workspaceFiles = await getEnabledWorkspaceFiles(agentId);
       const criticalRules = extractCriticalRules(workspaceFiles);
 
-      const result = await compactMessagesWithSummary(
-        guarded,
-        modelConfig.id,
-        modelConfig,
-        {
-          existingSummary: chat?.compactionSummary,
-          systemPromptTokens,
-          contextWindowOverride: effectiveContextWindow,
-          force: true,
-          criticalRules,
-        },
-      );
+      const result = await compactMessagesWithSummary(guarded, modelConfig.id, modelConfig, {
+        existingSummary: chat?.compactionSummary,
+        systemPromptTokens,
+        contextWindowOverride: effectiveContextWindow,
+        force: true,
+        criticalRules,
+      });
 
       if (!result.wasCompacted) {
         // force compaction was requested but nothing was compacted — this can happen
@@ -328,7 +336,10 @@ const messageHandlers: Record<string, MessageHandler> = {
         keptMessages: result.messages.length,
         tokensBefore: result.tokensBefore,
         tokensAfter: result.tokensAfter,
-        tokensSaved: result.tokensBefore && result.tokensAfter ? result.tokensBefore - result.tokensAfter : undefined,
+        tokensSaved:
+          result.tokensBefore && result.tokensAfter
+            ? result.tokensBefore - result.tokensAfter
+            : undefined,
         messagesDropped: result.messagesDropped,
         durationMs: result.durationMs,
       });
@@ -376,10 +387,7 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-// ── Port Listener for LLM Streaming ───────────
-
-const KEEP_ALIVE_ALARM = 'keep-alive';
-let activeStreams = 0;
+const streamKeepAlive = createKeepAliveManager('keep-alive');
 
 chrome.runtime.onConnect.addListener(port => {
   if (port.name === 'log-stream') {
@@ -388,17 +396,10 @@ chrome.runtime.onConnect.addListener(port => {
   }
 
   if (port.name === 'llm-stream') {
-    activeStreams++;
-    // Keep service worker alive during streaming
-    if (activeStreams === 1) {
-      chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.4 });
-    }
+    streamKeepAlive.acquire();
 
     port.onDisconnect.addListener(() => {
-      activeStreams = Math.max(0, activeStreams - 1);
-      if (activeStreams === 0) {
-        chrome.alarms.clear(KEEP_ALIVE_ALARM);
-      }
+      streamKeepAlive.release();
     });
 
     port.onMessage.addListener((msg: Record<string, unknown>) => {
@@ -461,12 +462,14 @@ chrome.runtime.onMessage.addListener(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: unknown) => void,
   ) => {
-    // Only handle messages originating from the offscreen document, not our own
+    // Only handle messages originating from the offscreen/worker document, not our own
     // broadcasts back to extension pages. Offscreen senders have sender.url set
     // to the offscreen HTML page; the SW broadcasting to itself has no url.
+    // On Firefox, workers run in a hidden popup window with the same page URL.
     const senderUrl = sender.url ?? '';
     const isFromOffscreen =
       sender.id === chrome.runtime.id && senderUrl.includes('offscreen-channels');
+    const isFromWorkerRouter = message._source === 'worker-router';
 
     if (typeof message.type === 'string') {
       const type = message.type;
@@ -478,7 +481,7 @@ chrome.runtime.onMessage.addListener(
         type === 'WA_CONNECTION_STATUS' ||
         type === 'WA_DEBUG'
       ) {
-        if (!isFromOffscreen) {
+        if (!isFromOffscreen && !isFromWorkerRouter) {
           // This is our own broadcast echoing back — ignore it
           return false;
         }
@@ -498,8 +501,4 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-// ── Side Panel Behavior ────────────────────────
-
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
-  // Ignore errors in environments that don't support sidePanel
-});
+initSidePanelBehavior();
