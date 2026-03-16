@@ -646,3 +646,41 @@ pnpm build:firefox
 # 4. Type-check:
 pnpm type-check
 ```
+
+---
+
+### 18. Service Worker / Event Page Keep-Alive Gaps
+
+#### Chrome vs Firefox: Lifecycle Differences
+
+| | Chrome MV3 | Firefox MV3 |
+|---|---|---|
+| **Type** | Service Worker | Event Page (non-persistent background script) |
+| **Manifest** | `background: { service_worker: "background.js" }` | `background: { scripts: ["background.js"] }` |
+| **Idle timeout** | 30 seconds of inactivity | "A few seconds" of inactivity (shorter, not precisely documented) |
+| **Max single event** | 5 minutes per event handler | Not explicitly documented |
+
+#### Why Chrome doesn't need explicit keep-alive for most operations
+
+Chrome has 3 key lifetime-extension mechanisms that Firefox doesn't fully replicate:
+
+1. **Active ports keep the worker alive (Chrome 114+):** When the side panel opens an `llm-stream` port via `chrome.runtime.connect()`, that open port itself keeps the Chrome service worker alive. Firefox event pages don't get the same lifetime extension from open ports.
+
+2. **Extension API calls reset the 30-second timer (Chrome 110+):** Every `chrome.storage.*`, `chrome.tabs.*`, or any other extension API call resets Chrome's 30-second idle timer. During a long LLM tool loop, Chrome's timer keeps getting reset automatically. Firefox doesn't guarantee this behavior.
+
+3. **Async event handlers extend lifetime:** When Chrome's `onAlarm` or `onMessage` listener runs an async handler (returns a Promise), Chrome extends the service worker lifetime until that Promise resolves (up to 5 minutes). Firefox may not reliably wait for fire-and-forget `.catch()` chains that aren't returned from the listener.
+
+#### Gaps identified and fixed
+
+| Gap | File | Duration | Fix |
+|-----|------|----------|-----|
+| Cron task execution (`runHeadlessLLM`) | `cron/executor.ts` | Up to 5 min | Wrapped `executeScheduledTask` with `cronKeepAlive.acquire()/release()` |
+| Session journal (2 LLM calls + indexing) | `index.ts` `SESSION_JOURNAL` handler | Up to 50+ sec | Wrapped with `streamKeepAlive.acquire()/release()` |
+| Manual compaction (LLM summarization) | `index.ts` `COMPACT_REQUEST` handler | Variable | Wrapped with `streamKeepAlive.acquire()/release()` |
+| Cron startup delay (`setTimeout(1000)`) | `index.ts` line 50 | 1 sec race | Replaced with `Promise.resolve().then()` — IndexedDB is available immediately |
+
+#### Design rationale
+
+On Chrome, the keep-alive alarm created by `createKeepAliveManager()` is **redundant** — Chrome already keeps the SW alive via open ports, API calls resetting the timer, and async handler lifetime extension. The alarm is harmless overhead.
+
+On Firefox, the keep-alive alarm is the **primary mechanism** preventing suspension. The gaps above were paths where no alarm was ticking and no port was keeping things alive, so Firefox could suspend the event page mid-operation.

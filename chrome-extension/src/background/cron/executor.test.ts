@@ -49,6 +49,10 @@ vi.mock('nanoid', () => ({ nanoid: () => 'test-id' }));
 
 vi.stubGlobal('chrome', {
   runtime: { sendMessage: vi.fn(async () => ({})) },
+  alarms: {
+    create: vi.fn(),
+    clear: vi.fn(),
+  },
 });
 
 // Import mocked modules for per-test overrides

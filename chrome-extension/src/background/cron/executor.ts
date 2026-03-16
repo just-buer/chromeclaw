@@ -5,6 +5,7 @@ import { getChannelAdapter } from '../channels/registry';
 import { getChannelConfigs } from '../channels/config';
 import { runHeadlessLLM, resolveDefaultModel, dbModelToChatModel } from '../agents/agent-setup';
 import { createLogger } from '../logging/logger-buffer';
+import { createKeepAliveManager } from '../utils/keep-alive';
 import {
   addMessage,
   getChat,
@@ -18,6 +19,7 @@ import type { TaskExecResult } from './service/state';
 import type { ScheduledTask, TaskDelivery } from './types';
 
 const cronLog = createLogger('cron');
+const cronKeepAlive = createKeepAliveManager('cron-keep-alive');
 
 const DEFAULT_TASK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -66,6 +68,8 @@ const deliverResult = async (task: ScheduledTask, responseText: string): Promise
 const executeScheduledTask = async (task: ScheduledTask): Promise<TaskExecResult> => {
   cronLog.info('Executing task', { taskId: task.id, name: task.name, kind: task.payload.kind });
 
+  cronKeepAlive.acquire();
+
   const payloadTimeout = task.payload.kind === 'agentTurn' ? task.payload.timeoutMs : undefined;
   const timeoutMs = task.timeoutMs ?? payloadTimeout ?? DEFAULT_TASK_TIMEOUT_MS;
   const controller = new AbortController();
@@ -86,6 +90,7 @@ const executeScheduledTask = async (task: ScheduledTask): Promise<TaskExecResult
     };
   } finally {
     clearTimeout(timer);
+    cronKeepAlive.release();
   }
 };
 

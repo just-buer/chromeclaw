@@ -46,12 +46,13 @@ const cronService = new CronService({
 
 setCronServiceRef(cronService);
 
-// Start cron after a short delay to let storage initialize
-setTimeout(() => {
+// Start cron — use microtask to avoid setTimeout race with Firefox event page suspension.
+// IndexedDB is available immediately; the 1-second delay was unnecessary and risky.
+Promise.resolve().then(() =>
   cronService.start().catch(err => {
     cronLog.error('Failed to start cron service', { error: String(err) });
-  });
-}, 1000);
+  }),
+);
 
 // ── Strip CORP headers for extension image loads ──
 // Google CDN (and other servers) set Cross-Origin-Resource-Policy: same-site,
@@ -214,8 +215,13 @@ const messageHandlers: Record<string, MessageHandler> = {
     if (!chatId) return { error: 'chatId is required' };
     const agentId = (request.agentId as string) || undefined;
     cronLog.debug('Session journal requested', { chatId, agentId });
-    const result = await runSessionJournal({ chatId, agentId });
-    return { result };
+    streamKeepAlive.acquire();
+    try {
+      const result = await runSessionJournal({ chatId, agentId });
+      return { result };
+    } finally {
+      streamKeepAlive.release();
+    }
   },
 
   CRON_STATUS: async () => {
@@ -272,43 +278,44 @@ const messageHandlers: Record<string, MessageHandler> = {
     if (!chatId || !modelConfig) return { error: 'chatId and modelConfig are required' };
 
     slashCmdLog.trace('COMPACT_REQUEST received', { chatId, modelId: modelConfig.id });
-
-    const {
-      getMessagesByChatId,
-      getChat,
-      updateCompactionSummary,
-      incrementCompactionCount,
-      getEnabledWorkspaceFiles,
-    } = await import('@extension/storage');
-    const { compactMessagesWithSummary } = await import('./context/compaction');
-    const { enforceToolResultBudget } = await import('./context/tool-result-context-guard');
-    const { extractCriticalRules } = await import('./context/summarizer');
-    const { buildHeadlessSystemPrompt } = await import('./agents/agent-setup');
-    const { getProviderTokenLimit } = await import('./context/provider-limit-cache');
-
-    const [messages, chat] = await Promise.all([getMessagesByChatId(chatId), getChat(chatId)]);
-    slashCmdLog.debug('Loaded messages for compaction', { chatId, messageCount: messages.length });
-    if (messages.length <= 2) return { error: 'Not enough messages to compact' };
-
-    // Build system prompt to get accurate token count (same as stream-handler.ts)
-    const agentId = chat?.agentId ?? 'main';
-    const systemPrompt = await buildHeadlessSystemPrompt(modelConfig, agentId);
-    const systemPromptTokens = Math.ceil(systemPrompt.length / 4);
-
-    // Use the lower of model contextWindow and any detected provider limit
-    const cachedLimit = getProviderTokenLimit(modelConfig.id);
-    const effectiveContextWindow =
-      cachedLimit && modelConfig.contextWindow
-        ? Math.min(cachedLimit, modelConfig.contextWindow)
-        : (cachedLimit ?? modelConfig.contextWindow);
-
-    slashCmdLog.trace('COMPACT_REQUEST: effective context window', {
-      cachedLimit,
-      modelContextWindow: modelConfig.contextWindow,
-      effectiveContextWindow,
-    });
+    streamKeepAlive.acquire();
 
     try {
+      const {
+        getMessagesByChatId,
+        getChat,
+        updateCompactionSummary,
+        incrementCompactionCount,
+        getEnabledWorkspaceFiles,
+      } = await import('@extension/storage');
+      const { compactMessagesWithSummary } = await import('./context/compaction');
+      const { enforceToolResultBudget } = await import('./context/tool-result-context-guard');
+      const { extractCriticalRules } = await import('./context/summarizer');
+      const { buildHeadlessSystemPrompt } = await import('./agents/agent-setup');
+      const { getProviderTokenLimit } = await import('./context/provider-limit-cache');
+
+      const [messages, chat] = await Promise.all([getMessagesByChatId(chatId), getChat(chatId)]);
+      slashCmdLog.debug('Loaded messages for compaction', { chatId, messageCount: messages.length });
+      if (messages.length <= 2) return { error: 'Not enough messages to compact' };
+
+      // Build system prompt to get accurate token count (same as stream-handler.ts)
+      const agentId = chat?.agentId ?? 'main';
+      const systemPrompt = await buildHeadlessSystemPrompt(modelConfig, agentId);
+      const systemPromptTokens = Math.ceil(systemPrompt.length / 4);
+
+      // Use the lower of model contextWindow and any detected provider limit
+      const cachedLimit = getProviderTokenLimit(modelConfig.id);
+      const effectiveContextWindow =
+        cachedLimit && modelConfig.contextWindow
+          ? Math.min(cachedLimit, modelConfig.contextWindow)
+          : (cachedLimit ?? modelConfig.contextWindow);
+
+      slashCmdLog.trace('COMPACT_REQUEST: effective context window', {
+        cachedLimit,
+        modelContextWindow: modelConfig.contextWindow,
+        effectiveContextWindow,
+      });
+
       // Pre-compaction: enforce tool result budget (same as transform.ts auto-compaction path)
       const guarded = enforceToolResultBudget(
         messages as import('@extension/shared').ChatMessage[],
@@ -372,6 +379,8 @@ const messageHandlers: Record<string, MessageHandler> = {
     } catch (err) {
       slashCmdLog.error('Compaction failed', { chatId, error: String(err) });
       throw err;
+    } finally {
+      streamKeepAlive.release();
     }
   },
 };
