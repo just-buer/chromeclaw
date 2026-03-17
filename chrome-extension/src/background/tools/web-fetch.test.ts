@@ -1,6 +1,62 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
+// Chrome API mocks — must be set up BEFORE importing the module under test
+// ---------------------------------------------------------------------------
+
+const mockTabsCreate = vi.fn(() => Promise.resolve({ id: 99 }));
+const mockTabsGet = vi.fn((_tabId: number) => Promise.resolve({ id: _tabId, title: 'Fallback Page', status: 'loading' }));
+const mockTabsRemove = vi.fn(() => Promise.resolve());
+const mockOnUpdatedAddListener = vi.fn();
+const mockOnUpdatedRemoveListener = vi.fn();
+const mockExecuteScript = vi.fn(() =>
+  Promise.resolve([{ result: 'Extracted page text content from browser fallback.' }]),
+);
+
+/** Helper: configure Chrome mocks for a successful fallback flow.
+ *  `onUpdated.addListener` fires `{ status: 'complete' }` via setTimeout(0). */
+const setupFallbackMocks = (opts?: { skipTabComplete?: boolean; tabStatus?: string }) => {
+  mockTabsCreate.mockReset();
+  mockTabsCreate.mockImplementation(() => Promise.resolve({ id: 99 }));
+  mockTabsGet.mockReset();
+  mockTabsGet.mockImplementation((_tabId: number) =>
+    Promise.resolve({ id: _tabId, title: 'Fallback Page', status: opts?.tabStatus ?? 'loading' }),
+  );
+  mockTabsRemove.mockReset();
+  mockTabsRemove.mockImplementation(() => Promise.resolve());
+  mockOnUpdatedAddListener.mockReset();
+  if (!opts?.skipTabComplete) {
+    mockOnUpdatedAddListener.mockImplementation((fn: (tabId: number, info: { status?: string }) => void) => {
+      setTimeout(() => fn(99, { status: 'complete' }), 0);
+    });
+  }
+  mockOnUpdatedRemoveListener.mockReset();
+  mockExecuteScript.mockReset();
+  mockExecuteScript.mockImplementation(() =>
+    Promise.resolve([{ result: 'Extracted page text content from browser fallback.' }]),
+  );
+};
+
+Object.defineProperty(globalThis, 'chrome', {
+  value: {
+    tabs: {
+      create: mockTabsCreate,
+      get: mockTabsGet,
+      remove: mockTabsRemove,
+      onUpdated: {
+        addListener: mockOnUpdatedAddListener,
+        removeListener: mockOnUpdatedRemoveListener,
+      },
+    },
+    scripting: {
+      executeScript: mockExecuteScript,
+    },
+  },
+  writable: true,
+  configurable: true,
+});
+
+// ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
 
@@ -514,6 +570,7 @@ describe('executeWebFetch error handling', () => {
   beforeEach(async () => {
     globalThis.fetch = vi.fn();
     FETCH_CACHE.clear();
+    setupFallbackMocks();
     const { readCache } = await import('./web-shared');
     vi.mocked(readCache).mockReset();
     vi.mocked(readCache).mockReturnValue(null);
@@ -523,16 +580,15 @@ describe('executeWebFetch error handling', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns enriched error on network failure instead of throwing', async () => {
+  it('returns fallback content on network failure for GET text request', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
 
     const result = await executeWebFetch({ url: 'https://network-error.example.com' });
 
-    expect(result.text).toBe('');
-    expect(result.status).toBe(0);
-    expect(result.error).toContain('Network error');
-    expect(result.error).toContain('Failed to fetch');
-    expect(result.error).toContain('browser tool');
+    // Browser fallback kicks in for GET text requests
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('Extracted page text content from browser fallback.');
+    expect(result.status).toBe(200);
   });
 
   it('returns timeout-specific error on AbortError', async () => {
@@ -1018,6 +1074,215 @@ describe('executeWebFetch — cache behavior', () => {
 // ---------------------------------------------------------------------------
 
 const { webFetchToolDef } = await import('./web-fetch');
+
+// ---------------------------------------------------------------------------
+// Browser fallback
+// ---------------------------------------------------------------------------
+
+describe('executeWebFetch — browser fallback', () => {
+  beforeEach(async () => {
+    globalThis.fetch = vi.fn();
+    FETCH_CACHE.clear();
+    setupFallbackMocks();
+    const { readCache, writeCache } = await import('./web-shared');
+    vi.mocked(readCache).mockReset();
+    vi.mocked(readCache).mockReturnValue(null);
+    vi.mocked(writeCache).mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // ── Trigger conditions ──
+
+  it('CORS error triggers fallback for GET text — returns extracted content', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'https://cors-blocked.example.com' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('Extracted page text content from browser fallback.');
+    expect(result.status).toBe(200);
+    expect(mockTabsCreate).toHaveBeenCalledWith({ url: 'https://cors-blocked.example.com', active: false });
+    expect(mockTabsRemove).toHaveBeenCalledWith(99);
+  });
+
+  it('CORS error triggers fallback for GET html mode', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'https://cors-blocked.example.com', extractMode: 'html' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('Extracted page text content from browser fallback.');
+  });
+
+  it('timeout does NOT trigger fallback', async () => {
+    const abortError = new DOMException('The operation was aborted', 'AbortError');
+    vi.mocked(globalThis.fetch).mockRejectedValue(abortError);
+
+    const result = await executeWebFetch({ url: 'https://slow.example.com' });
+
+    expect(result.error).toContain('timed out');
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+    expect(result.browserFallback).toBeUndefined();
+  });
+
+  it('POST does NOT trigger fallback', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'https://api.example.com', method: 'POST', body: '{}' });
+
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+    expect(result.error).toContain('Network error');
+    expect(result.error).toContain('browser tool');
+    expect(result.browserFallback).toBeUndefined();
+  });
+
+  it('binary mode does NOT trigger fallback', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'https://example.com/image.png', extractMode: 'binary' });
+
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+    expect(result.error).toContain('Network error');
+    expect(result.browserFallback).toBeUndefined();
+  });
+
+  // ── URL scheme guard ──
+
+  it('blocks non-http(s) URLs — chrome://', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'chrome://settings' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('');
+    expect(result.error).toContain('unsupported protocol');
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+  });
+
+  it('blocks non-http(s) URLs — file://', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await executeWebFetch({ url: 'file:///etc/passwd' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.error).toContain('unsupported protocol');
+    expect(mockTabsCreate).not.toHaveBeenCalled();
+  });
+
+  // ── Tab lifecycle and cleanup ──
+
+  it('tab is always closed even when extraction fails', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    mockExecuteScript.mockRejectedValue(new Error('Script injection failed'));
+
+    const result = await executeWebFetch({ url: 'https://cors-blocked.example.com' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('');
+    expect(result.error).toContain('Browser fallback failed');
+    expect(mockTabsRemove).toHaveBeenCalledWith(99);
+  });
+
+  it('fallback returns error when tab creation returns no id', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    mockTabsCreate.mockImplementation(() => Promise.resolve({ id: undefined } as unknown as chrome.tabs.Tab));
+
+    const result = await executeWebFetch({ url: 'https://cors-blocked.example.com' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('');
+    expect(result.error).toContain('could not create tab');
+  });
+
+  // ── Race condition: tab already complete before listener attached ──
+
+  it('resolves when tab is already complete before onUpdated listener fires', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    // onUpdated listener never fires, but tabs.get returns status: 'complete'
+    setupFallbackMocks({ skipTabComplete: true, tabStatus: 'complete' });
+
+    const result = await executeWebFetch({ url: 'https://fast-page.example.com' });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('Extracted page text content from browser fallback.');
+    expect(result.status).toBe(200);
+  });
+
+  // ── waitForTabLoad timeout ──
+
+  it('returns error when tab load times out', async () => {
+    vi.useFakeTimers();
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    // onUpdated listener never fires AND tab stays in 'loading' state
+    setupFallbackMocks({ skipTabComplete: true, tabStatus: 'loading' });
+
+    const promise = executeWebFetch({ url: 'https://hanging-page.example.com' });
+    // Advance past the 15s fallback timeout
+    await vi.advanceTimersByTimeAsync(16_000);
+    const result = await promise;
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text).toBe('');
+    expect(result.error).toContain('Browser fallback failed');
+    expect(result.error).toContain('timed out');
+    expect(mockTabsRemove).toHaveBeenCalledWith(99);
+    vi.useRealTimers();
+  });
+
+  // ── Content handling ──
+
+  it('fallback respects maxChars', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    mockExecuteScript.mockImplementation(() =>
+      Promise.resolve([{ result: 'A'.repeat(500) }] as unknown as Awaited<ReturnType<typeof chrome.scripting.executeScript>>),
+    );
+
+    const result = await executeWebFetch({ url: 'https://cors-blocked.example.com', maxChars: 100 });
+
+    expect(result.browserFallback).toBe(true);
+    expect(result.text.length).toBeLessThanOrEqual(100);
+  });
+
+  it('treats non-string executeScript result as empty text', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    mockExecuteScript.mockImplementation(() =>
+      Promise.resolve([{ result: null }] as unknown as Awaited<ReturnType<typeof chrome.scripting.executeScript>>),
+    );
+
+    const result = await executeWebFetch({ url: 'https://error-page.example.com' });
+
+    expect(result.browserFallback).toBe(true);
+    // Empty fallback → both-failed error path
+    expect(result.text).toBe('');
+    expect(result.error).toContain('Browser fallback also failed');
+  });
+
+  // ── Caching ──
+
+  it('caches successful fallback result', async () => {
+    const { writeCache } = await import('./web-shared');
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await executeWebFetch({ url: 'https://cors-blocked.example.com' });
+
+    expect(writeCache).toHaveBeenCalled();
+  });
+
+  it('does not cache when fallback returns empty content', async () => {
+    const { writeCache } = await import('./web-shared');
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    mockExecuteScript.mockImplementation(() =>
+      Promise.resolve([{ result: '' }] as unknown as Awaited<ReturnType<typeof chrome.scripting.executeScript>>),
+    );
+
+    await executeWebFetch({ url: 'https://empty-page.example.com' });
+
+    expect(writeCache).not.toHaveBeenCalled();
+  });
+});
 
 describe('webFetchToolDef.formatResult', () => {
   it('returns image content block for image/* binary', () => {

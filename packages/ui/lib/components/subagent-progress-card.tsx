@@ -1,3 +1,4 @@
+import { DocumentPreview } from './document-preview';
 import { Response } from './elements/response';
 import { cn } from '../utils';
 import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui';
@@ -7,6 +8,7 @@ import {
   Loader2Icon,
   BotIcon,
   XCircleIcon,
+  SquareIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { SubagentProgressInfo, SubagentProgressStep } from '@extension/shared';
@@ -14,6 +16,7 @@ import type { SubagentProgressInfo, SubagentProgressStep } from '@extension/shar
 type SubagentProgressCardProps = {
   info: SubagentProgressInfo;
   className?: string;
+  onStop?: (runId: string) => void;
 };
 
 const formatElapsed = (seconds: number): string => {
@@ -65,7 +68,7 @@ const StepDetails = ({ step }: { step: SubagentProgressStep }) => {
   );
 };
 
-const SubagentProgressCard = ({ info, className }: SubagentProgressCardProps) => {
+const SubagentProgressCard = ({ info, className, onStop }: SubagentProgressCardProps) => {
   const [elapsed, setElapsed] = useState(() => Math.floor((Date.now() - info.startedAt) / 1000));
 
   useEffect(() => {
@@ -91,12 +94,27 @@ const SubagentProgressCard = ({ info, className }: SubagentProgressCardProps) =>
             <Loader2Icon className="size-3 animate-spin" />
             <span>{formatElapsed(elapsed)}</span>
           </Badge>
+          {onStop && (
+            <button
+              aria-label="Stop subagent"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted rounded p-0.5 transition-colors"
+              onClick={e => {
+                e.stopPropagation();
+                onStop(info.runId);
+              }}
+              type="button">
+              <SquareIcon className="size-3.5" />
+            </button>
+          )}
           <ChevronDownIcon className="text-muted-foreground size-4 transition-transform group-data-[state=open]:rotate-180" />
         </div>
       </CollapsibleTrigger>
 
       <CollapsibleContent className="text-popover-foreground outline-hidden">
         <div className="space-y-1 px-4 pb-3">
+          <p className="text-muted-foreground mb-2 text-xs whitespace-pre-wrap">
+            {info.task.length > 300 ? info.task.slice(0, 300) + '…' : info.task}
+          </p>
           {info.steps.length === 0 && (
             <p className="text-muted-foreground animate-pulse text-xs">Starting...</p>
           )}
@@ -135,31 +153,36 @@ type SubagentResultCardProps = {
   runId: string;
   task: string;
   findings: string;
+  artifactId?: string;
 };
 
-const SubagentResultCard = ({ task, findings }: SubagentResultCardProps) => {
+const SubagentResultCard = ({ task, findings, artifactId }: SubagentResultCardProps) => {
   return (
-    <Collapsible
-      className="not-prose mb-4 w-full rounded-md border"
-      defaultOpen={true}>
-      <CollapsibleTrigger className="flex w-full min-w-0 items-center justify-between gap-2 p-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <BotIcon className="text-muted-foreground size-4 shrink-0" />
-          <span className="truncate text-sm font-medium">
-            {task.length > 60 ? task.slice(0, 60) + '…' : task}
-          </span>
-        </div>
-        <Badge className="rounded-full text-xs" variant="secondary">
+    <div className="not-prose mb-4 w-full space-y-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <BotIcon className="text-muted-foreground size-4 shrink-0" />
+        <span className="truncate text-sm font-medium">{task}</span>
+        <Badge className="shrink-0 rounded-full text-xs" variant="secondary">
           <CheckCircleIcon className="mr-1 size-3 text-green-600" />
           Done
         </Badge>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="outline-hidden">
-        <div className="max-w-none px-4 pb-3">
-          <Response>{findings}</Response>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+      </div>
+      {artifactId ? (
+        <DocumentPreview result={{ id: artifactId, title: task, kind: 'text' }} />
+      ) : (
+        <Collapsible className="w-full rounded-md border" defaultOpen={true}>
+          <CollapsibleTrigger className="text-muted-foreground flex w-full items-center gap-1 px-3 py-2 text-xs hover:underline">
+            <ChevronDownIcon className="size-3 transition-transform group-data-[state=open]:rotate-180" />
+            Findings
+          </CollapsibleTrigger>
+          <CollapsibleContent className="outline-hidden">
+            <div className="max-w-none px-4 pb-3">
+              <Response>{findings}</Response>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
   );
 };
 

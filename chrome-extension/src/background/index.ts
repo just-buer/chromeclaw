@@ -195,6 +195,14 @@ const messageHandlers: Record<string, MessageHandler> = {
     return { downloadId };
   },
 
+  SUBAGENT_STOP: async request => {
+    const runId = request.runId as string;
+    if (!runId) return { status: 'error', error: 'runId is required' };
+    const { executeKillSubagent } = await import('./tools/subagent');
+    const result = await executeKillSubagent({ runId });
+    return JSON.parse(result);
+  },
+
   SESSION_JOURNAL: async request => {
     const chatId = request.chatId as string;
     if (!chatId) return { error: 'chatId is required' };

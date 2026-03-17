@@ -26,6 +26,11 @@ const smallConfig: ToolLoopConfig = {
   pollNoProgressThreshold: 5,
   windowSize: 20,
   warningThrottleInterval: 10,
+  highCostTools: ['browser', 'debugger'],
+  highCostWarningThreshold: 2,
+  largeResultWarningThreshold: 4,
+  largeResultBreakerThreshold: 8,
+  largeResultSizeBytes: 50000,
 };
 
 /** Helper: record a call and set its result in one step. */
@@ -252,6 +257,67 @@ describe('tool-loop-detection', () => {
     }
     const result = await detectToolCallLoop(state, 'old_tool', { q: 'old' }, config);
     expect(result.severity).toBe('none');
+  });
+
+  it('high-cost tools warn at lower threshold', async () => {
+    const config = { ...smallConfig, highCostWarningThreshold: 2 };
+    // Record 2 identical browser calls (below normal warningThreshold of 3)
+    for (let i = 0; i < 2; i++) {
+      await recordWithResult(state, 'browser', { action: 'snapshot', tabId: 1 }, 'same', `id-${i}`, config);
+    }
+    const result = await detectToolCallLoop(state, 'browser', { action: 'snapshot', tabId: 1 }, config);
+    expect(result.severity).toBe('warning');
+    expect(result.shouldBlock).toBe(false);
+  });
+
+  it('non-high-cost tools use normal warning threshold', async () => {
+    const config = { ...smallConfig, highCostWarningThreshold: 2 };
+    // Record 2 identical calls for a non-high-cost tool — should NOT warn
+    for (let i = 0; i < 2; i++) {
+      await recordWithResult(state, 'web_search', { q: 'test' }, 'same', `id-${i}`, config);
+    }
+    const result = await detectToolCallLoop(state, 'web_search', { q: 'test' }, config);
+    expect(result.severity).toBe('none');
+  });
+
+  it('large-result stagnation emits warning at threshold', async () => {
+    const config = { ...smallConfig, largeResultWarningThreshold: 4, largeResultSizeBytes: 100 };
+    // Record 4 calls with large results (different results each time, so no no-progress breaker)
+    for (let i = 0; i < 4; i++) {
+      await recordToolCall(state, 'browser', { action: 'snapshot', tabId: 1 }, `id-${i}`, config);
+      // Manually set resultSize to simulate large results
+      state.entries[state.entries.length - 1]!.resultSize = 200;
+      state.entries[state.entries.length - 1]!.resultHash = `hash-${i}`;
+    }
+    const result = await detectToolCallLoop(state, 'browser', { action: 'snapshot', tabId: 1 }, config);
+    expect(result.severity).toBe('warning');
+    expect(result.shouldBlock).toBe(false);
+    expect(result.reason).toContain('large page snapshots');
+  });
+
+  it('large-result stagnation triggers circuit breaker at high threshold', async () => {
+    const config = { ...smallConfig, largeResultBreakerThreshold: 6, largeResultSizeBytes: 100, windowSize: 30 };
+    for (let i = 0; i < 6; i++) {
+      await recordToolCall(state, 'browser', { action: 'snapshot', tabId: 1 }, `id-${i}`, config);
+      state.entries[state.entries.length - 1]!.resultSize = 200;
+      state.entries[state.entries.length - 1]!.resultHash = `hash-${i}`;
+    }
+    const result = await detectToolCallLoop(state, 'browser', { action: 'snapshot', tabId: 1 }, config);
+    expect(result.severity).toBe('circuit_breaker');
+    expect(result.shouldBlock).toBe(true);
+    expect(result.reason).toContain('large results');
+  });
+
+  it('small results do not trigger large-result stagnation', async () => {
+    const config = { ...smallConfig, largeResultWarningThreshold: 4, largeResultSizeBytes: 100 };
+    for (let i = 0; i < 6; i++) {
+      await recordToolCall(state, 'browser', { action: 'snapshot', tabId: 1 }, `id-${i}`, config);
+      state.entries[state.entries.length - 1]!.resultSize = 50; // below threshold
+      state.entries[state.entries.length - 1]!.resultHash = `hash-${i}`;
+    }
+    const result = await detectToolCallLoop(state, 'browser', { action: 'snapshot', tabId: 1 }, config);
+    // Should not trigger large-result warning since sizes are small
+    expect(result.reason ?? '').not.toContain('large page snapshots');
   });
 });
 

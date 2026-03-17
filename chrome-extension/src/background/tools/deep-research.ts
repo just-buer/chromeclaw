@@ -138,6 +138,7 @@ const executeDeepResearch = async (
     context,
     {
       label: `Deep research: ${args.topic}`,
+      createArtifact: true,
       onComplete: async ({ responseText, error }) => {
         // Deterministically save report to workspace
         if (workspacePath && responseText && !error) {

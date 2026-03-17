@@ -28,6 +28,7 @@ type ChatProps = {
   activeAgentId?: string;
   onAgentChange?: (agentId: string) => void;
   activeSubagents?: SubagentProgressInfo[];
+  onStopSubagent?: (runId: string) => void;
 };
 
 const Chat = ({
@@ -46,6 +47,7 @@ const Chat = ({
   activeAgentId,
   onAgentChange,
   activeSubagents,
+  onStopSubagent,
 }: ChatProps) => {
   // Track accumulated token usage for context status badge
   const usageRef = useRef({
@@ -178,14 +180,15 @@ const Chat = ({
       if (message.chatId !== chatId) return;
 
       const runId = String(message.runId ?? '');
+      const artifactId = String(message.artifactId ?? '');
       const systemMsg: ChatMessage = {
         id: `subagent-result-${runId}`,
         chatId,
         role: 'system',
         parts: [{ type: 'text', text: String(message.findings ?? '') }],
         createdAt: Date.now(),
-        // Encode runId + task into model field for SubagentResultCard rendering
-        model: `__subagent:${runId}:${String(message.task ?? '')}`,
+        // Encode runId + artifactId + task into model field for SubagentResultCard rendering
+        model: `__subagent:${runId}:${artifactId}:${String(message.task ?? '')}`,
       };
       setMessages(prev => [...prev, systemMsg]);
     };
@@ -248,6 +251,7 @@ const Chat = ({
           messages={messages}
           onEditSubmit={handleEditSubmit}
           onSendMessage={(content: string) => sendMessage(content)}
+          onStopSubagent={onStopSubagent}
           setMessages={setMessages}
           status={isCompacting ? 'connecting' : status}
         />

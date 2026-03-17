@@ -13,40 +13,55 @@
 
 interface ToolLoopConfig {
   enabled: boolean;
-  /** Number of identical calls before warning. Default 10 */
+  /** Number of identical calls before warning. Default 5 */
   warningThreshold: number;
-  /** Number of identical calls before critical. Default 20 */
+  /** Number of identical calls before critical. Default 10 */
   criticalThreshold: number;
-  /** Number of same-args repeats before circuit breaker (requires no-progress). Default 30 */
+  /** Number of same-args repeats before circuit breaker (requires no-progress). Default 15 */
   breakerThreshold: number;
   /** Ping-pong pattern length to detect. Default 6 */
   pingPongThreshold: number;
   /** Min no-progress entries for ping-pong to block. Default 4 */
   pingPongNoProgressMin: number;
-  /** Consecutive no-progress calls (any tool) to block. Default 30 */
+  /** Consecutive no-progress calls (any tool) to block. Default 15 */
   globalNoProgressBreaker: number;
   /** Tools with lower blocking threshold (e.g. polling). Default [] */
   knownPollTools: string[];
-  /** Poll tool no-progress block threshold. Default 20 */
+  /** Poll tool no-progress block threshold. Default 10 */
   pollNoProgressThreshold: number;
   /** Sliding window size. Default 60 */
   windowSize: number;
-  /** Emit warning every N calls per bucket. Default 10 */
+  /** Emit warning every N calls per bucket. Default 5 */
   warningThrottleInterval: number;
+  /** High-cost tools that get stricter thresholds for warnings. Default ['browser', 'debugger'] */
+  highCostTools: string[];
+  /** Warning threshold for high-cost tools. Default 3 */
+  highCostWarningThreshold: number;
+  /** Number of large-result calls (>50KB) before warning. Default 8 */
+  largeResultWarningThreshold: number;
+  /** Number of large-result calls (>50KB) before circuit breaker. Default 15 */
+  largeResultBreakerThreshold: number;
+  /** Byte threshold to consider a result "large". Default 50000 */
+  largeResultSizeBytes: number;
 }
 
 const DEFAULT_TOOL_LOOP_CONFIG: ToolLoopConfig = {
   enabled: true,
-  warningThreshold: 10,
-  criticalThreshold: 20,
-  breakerThreshold: 30,
+  warningThreshold: 5,
+  criticalThreshold: 10,
+  breakerThreshold: 15,
   pingPongThreshold: 6,
   pingPongNoProgressMin: 4,
-  globalNoProgressBreaker: 30,
+  globalNoProgressBreaker: 15,
   knownPollTools: [],
-  pollNoProgressThreshold: 20,
+  pollNoProgressThreshold: 10,
   windowSize: 60,
-  warningThrottleInterval: 10,
+  warningThrottleInterval: 5,
+  highCostTools: ['browser', 'debugger'],
+  highCostWarningThreshold: 3,
+  largeResultWarningThreshold: 8,
+  largeResultBreakerThreshold: 15,
+  largeResultSizeBytes: 50000,
 };
 
 type LoopSeverity = 'none' | 'warning' | 'critical' | 'circuit_breaker';
@@ -62,6 +77,7 @@ interface ToolCallRecord {
   argsHash: string;
   toolCallId?: string;
   resultHash?: string;
+  resultSize?: number;
   timestamp: number;
 }
 
@@ -287,6 +303,9 @@ const recordToolCallOutcome = async (
   for (let i = state.entries.length - 1; i >= 0; i--) {
     if (state.entries[i]!.toolCallId === toolCallId) {
       state.entries[i]!.resultHash = await hashResult(result);
+      // Track result size for large-result stagnation detection
+      const serialized = stableJsonSerialize(result);
+      state.entries[i]!.resultSize = serialized.length;
       return;
     }
   }
@@ -372,7 +391,39 @@ const detectToolCallLoop = async (
     return { severity: 'none', shouldBlock: false };
   }
 
-  // 5. Generic repeat warning/critical (never blocks)
+  // 5. Large-result stagnation detection (catches "different results but no progress" loops)
+  if (config.largeResultSizeBytes > 0) {
+    const recentToolCalls = window.filter(e => e.toolName === toolName);
+    const recentLargeResults = recentToolCalls.filter(
+      e => e.resultSize != null && e.resultSize >= config.largeResultSizeBytes,
+    );
+
+    if (recentLargeResults.length >= config.largeResultBreakerThreshold) {
+      return {
+        severity: 'circuit_breaker',
+        shouldBlock: true,
+        reason: `Tool ${toolName}: ${recentLargeResults.length} calls returned large results (>${Math.round(config.largeResultSizeBytes / 1000)}KB each) without synthesizing data — circuit breaker triggered`,
+      };
+    }
+
+    if (recentLargeResults.length >= config.largeResultWarningThreshold) {
+      const bucketKey = `large-result:${toolName}`;
+      if (shouldEmitWarning(state, bucketKey, config.warningThrottleInterval)) {
+        return {
+          severity: 'warning',
+          shouldBlock: false,
+          reason: `Warning: You've captured ${recentLargeResults.length}+ large page snapshots without synthesizing the data. Consider stopping to analyze what you have before making more ${toolName} calls.`,
+        };
+      }
+    }
+  }
+
+  // 6. High-cost tool early warning
+  const effectiveWarningThreshold = config.highCostTools.includes(toolName)
+    ? config.highCostWarningThreshold
+    : config.warningThreshold;
+
+  // 7. Generic repeat warning/critical (never blocks)
   if (sameArgsCount >= config.criticalThreshold) {
     const bucketKey = `generic:${toolName}:${argsHash}`;
     if (shouldEmitWarning(state, bucketKey, config.warningThrottleInterval)) {
@@ -385,7 +436,7 @@ const detectToolCallLoop = async (
     return { severity: 'none', shouldBlock: false };
   }
 
-  if (sameArgsCount >= config.warningThreshold) {
+  if (sameArgsCount >= effectiveWarningThreshold) {
     const bucketKey = `generic:${toolName}:${argsHash}`;
     if (shouldEmitWarning(state, bucketKey, config.warningThrottleInterval)) {
       return {

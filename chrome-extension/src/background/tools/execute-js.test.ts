@@ -192,7 +192,7 @@ describe('executeCode', () => {
 
   it('handles undefined return (no return statement)', async () => {
     const result = await executeCode('const x = 1;');
-    expect(result).toBe('undefined');
+    expect(result).toBe('OK (expression returned void).');
   });
 
   it('handles null return', async () => {

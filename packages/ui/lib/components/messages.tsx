@@ -9,22 +9,30 @@ import type { ChatMessage, StreamingStatus, SubagentProgressInfo } from '@extens
 
 const COMPACTION_IDS = new Set(['__compaction_summary__', '__compaction_marker__']);
 
+type SubagentParsed = { runId: string; task: string; findings: string; artifactId?: string };
+
 /** Parse subagent result from model field (live messages injected by Chat.tsx). */
-const parseSubagentFromModel = (msg: ChatMessage): { runId: string; task: string; findings: string } | null => {
+const parseSubagentFromModel = (msg: ChatMessage): SubagentParsed | null => {
   if (msg.role !== 'system' || !msg.model?.startsWith('__subagent:')) return null;
-  const [, runId, ...taskParts] = msg.model.split(':');
-  const task = taskParts.join(':');
+  const [, runId, ...rest] = msg.model.split(':');
   const findings = msg.parts[0]?.type === 'text' ? msg.parts[0].text : '';
-  return { runId, task, findings };
+  // Legacy format: __subagent:<runId>:<task>
+  if (rest.length === 1) {
+    return { runId, task: rest[0], findings };
+  }
+  // New format: __subagent:<runId>:<artifactId?>:<task>
+  const artifactId = rest[0] || undefined;
+  const task = rest.slice(1).join(':');
+  return { runId, task, findings, artifactId };
 };
 
 /** Parse subagent result from text content (DB-loaded messages). */
-const parseSubagentFromText = (msg: ChatMessage): { runId: string; task: string; findings: string } | null => {
+const parseSubagentFromText = (msg: ChatMessage): SubagentParsed | null => {
   if (msg.role !== 'system') return null;
   const text = msg.parts[0]?.type === 'text' ? msg.parts[0].text : '';
-  const match = text.match(/^\[subagent-result runId=(.+?)\]\n\nTask: (.+?)\n\n([\s\S]*)$/);
+  const match = text.match(/^\[subagent-result runId=(.+?)(?:\s+artifactId=(.+?))?\]\n\nTask: (.+?)\n\n([\s\S]*)$/);
   if (!match) return null;
-  return { runId: match[1], task: match[2], findings: match[3] };
+  return { runId: match[1], task: match[3], findings: match[4], artifactId: match[2] };
 };
 
 const parseSubagentResult = (msg: ChatMessage) =>
@@ -38,6 +46,7 @@ type MessagesProps = {
   onEditSubmit?: (messageId: string, content: string) => void;
   onSendMessage?: (content: string) => void;
   activeSubagents?: SubagentProgressInfo[];
+  onStopSubagent?: (runId: string) => void;
 };
 
 const Messages = ({
@@ -47,6 +56,7 @@ const Messages = ({
   onEditSubmit,
   onSendMessage,
   activeSubagents,
+  onStopSubagent,
 }: MessagesProps) => {
   const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
@@ -101,7 +111,7 @@ const Messages = ({
           })}
 
           {activeSubagents?.map(sa => (
-            <SubagentProgressCard key={sa.runId} info={sa} />
+            <SubagentProgressCard key={sa.runId} info={sa} onStop={onStopSubagent} />
           ))}
 
           {status === 'connecting' && <ThinkingMessage />}

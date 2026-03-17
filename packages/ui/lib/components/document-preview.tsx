@@ -76,7 +76,7 @@ const DocumentPreview = ({ result, args }: DocumentPreviewProps) => {
       tabIndex={0}>
       {/* Header */}
       <div className="border-border dark:bg-muted flex items-center justify-between gap-2 rounded-t-xl border border-b-0 p-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-muted-foreground">
             {isStreaming ? (
               <Loader2Icon className="size-4 animate-spin" />

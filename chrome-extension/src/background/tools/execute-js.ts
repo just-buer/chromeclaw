@@ -384,7 +384,7 @@ const executeCode = async (
   }
 
   let returnValue: string;
-  if (result.result.type === 'undefined') returnValue = 'undefined';
+  if (result.result.type === 'undefined') returnValue = 'OK (expression returned void).';
   else if (result.result.subtype === 'null') returnValue = 'null';
   else if (result.result.value !== undefined) {
     returnValue =

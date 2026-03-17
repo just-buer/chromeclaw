@@ -71,6 +71,7 @@ const mockAddMessage = vi.fn(async () => {});
 
 vi.mock('@extension/storage', () => ({
   addMessage: (...args: unknown[]) => mockAddMessage(...args),
+  saveArtifact: vi.fn(async () => {}),
   toolConfigStorage: {
     get: vi.fn(async () => ({
       enabledTools: {

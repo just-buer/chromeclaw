@@ -52,6 +52,7 @@ const FullPageChat = () => {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [models, setModels] = useState<ChatModel[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const firstRunRef = useRef(true);
   const [selectedModelId, setSelectedModelId] = useState('');
   const [locale, setLocale] = useState<LocaleCode>('auto');
 
@@ -222,6 +223,7 @@ const FullPageChat = () => {
         })) as ChatModel[];
 
         setModels(mapped);
+        if (mapped.length > 0) firstRunRef.current = false;
         const restoredId =
           savedModelId && mapped.some(m => m.id === savedModelId)
             ? savedModelId
@@ -239,7 +241,9 @@ const FullPageChat = () => {
   // Subscribe to model storage changes so UI stays in sync with options page
   useEffect(() => {
     const unsub1 = selectedModelStorage.subscribe(() => loadModels());
-    const unsub2 = customModelsStorage.subscribe(() => loadModels());
+    const unsub2 = customModelsStorage.subscribe(() => {
+      if (!firstRunRef.current) loadModels();
+    });
     return () => { unsub1(); unsub2(); };
   }, [loadModels]);
 
@@ -293,6 +297,10 @@ const FullPageChat = () => {
     chrome.runtime.onMessage.addListener(handler);
     return () => chrome.runtime.onMessage.removeListener(handler);
   }, [reloadMessages]);
+
+  const stopSubagent = useCallback((runId: string) => {
+    chrome.runtime.sendMessage({ type: 'SUBAGENT_STOP', runId }).catch(() => {});
+  }, []);
 
   // Track subagent progress via shared hook
   const activeSubagents = useSubagentProgress(chatId, {
@@ -443,6 +451,7 @@ const FullPageChat = () => {
   );
 
   const handleFirstRunComplete = useCallback(() => {
+    firstRunRef.current = false;
     loadModels();
   }, [loadModels]);
 
@@ -506,6 +515,7 @@ const FullPageChat = () => {
               onModelChange={handleModelChange}
               onNewChat={handleNewChat}
               onOpenSidebar={() => setSidebarOpen(prev => !prev)}
+              onStopSubagent={stopSubagent}
               onStreamComplete={handleStreamComplete}
               selectedModel={selectedModel}
             />
