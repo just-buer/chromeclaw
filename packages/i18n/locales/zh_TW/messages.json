@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Tools"
   },
+  "firstRun_stepPermissions": {
+    "message": "權限"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "主機權限"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox 需要明確授權才能讓工具與網頁互動。請授予存取權限，以便 AI 助理能夠讀取和操作頁面內容。"
+  },
+  "firstRun_permissionsGranted": {
+    "message": "主機權限已授予 — 工具可以存取網頁。"
+  },
+  "firstRun_permissionsGrant": {
+    "message": "授予權限"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "權限被拒絕。與網頁互動的工具可能無法正常運作。您可以稍後在擴充功能的權限設定中授予此權限。"
+  },
   "firstRun_step2Title": {
     "message": "Connect Channels"
   },

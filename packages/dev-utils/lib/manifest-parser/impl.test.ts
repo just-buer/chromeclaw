@@ -42,6 +42,12 @@ const buildTestManifest = (overrides?: Partial<ManifestType>): ManifestType =>
       client_id: 'test-client-id.apps.googleusercontent.com',
       scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
     },
+    action: {
+      default_icon: {
+        '16': 'icon-16.png',
+        '32': 'icon-32.png',
+      },
+    },
     sidebar_action: {
       default_panel: 'side-panel/index.html',
       default_title: 'TestExtension',
@@ -106,8 +112,9 @@ describe('ManifestParserImpl — Firefox conversion', () => {
     const result = parseResult(manifest, true);
 
     expect(result.sidebar_action).toBeDefined();
-    const sidebar = result.sidebar_action as { default_panel: string };
+    const sidebar = result.sidebar_action as { default_panel: string; default_icon?: Record<string, string> };
     expect(sidebar.default_panel).toBe('side-panel/index.html');
+    expect(sidebar.default_icon).toEqual({ '16': 'icon-16.png', '32': 'icon-32.png' });
   });
 
   it('replaces CSP with Firefox-compatible version (no img-src)', () => {
@@ -140,5 +147,11 @@ describe('ManifestParserImpl — Chrome passthrough', () => {
     // Chrome keeps service_worker
     const background = result.background as { service_worker?: string };
     expect(background.service_worker).toBe('background.js');
+
+    // Chrome sidebar_action is unchanged (no default_icon injected)
+    const sidebar = result.sidebar_action as { default_panel: string; default_title: string; default_icon?: unknown };
+    expect(sidebar.default_panel).toBe('side-panel/index.html');
+    expect(sidebar.default_title).toBe('TestExtension');
+    expect(sidebar.default_icon).toBeUndefined();
   });
 });

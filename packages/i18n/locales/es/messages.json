@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Tools"
   },
+  "firstRun_stepPermissions": {
+    "message": "Permisos"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Permisos de host"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox requiere permiso explícito para que las herramientas interactúen con las páginas web. Otorga acceso para que el asistente de IA pueda leer y actuar sobre el contenido de la página."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Permisos de host otorgados — las herramientas pueden acceder a las páginas web."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Otorgar permiso"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "El permiso fue denegado. Las herramientas que interactúan con páginas web pueden no funcionar. Puedes otorgar este permiso más tarde en la configuración de permisos de la extensión."
+  },
   "firstRun_step2Title": {
     "message": "Connect Channels"
   },

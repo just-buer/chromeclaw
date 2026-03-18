@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Tools"
   },
+  "firstRun_stepPermissions": {
+    "message": "権限"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "ホスト権限"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefoxでは、ツールがWebページと連携するために明示的な許可が必要です。AIアシスタントがページの内容を読み取って操作できるようにアクセスを許可してください。"
+  },
+  "firstRun_permissionsGranted": {
+    "message": "ホスト権限が付与されました — ツールはWebページにアクセスできます。"
+  },
+  "firstRun_permissionsGrant": {
+    "message": "権限を付与"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "権限が拒否されました。Webページと連携するツールが動作しない場合があります。拡張機能の権限設定から後で付与できます。"
+  },
   "firstRun_step2Title": {
     "message": "Connect Channels"
   },

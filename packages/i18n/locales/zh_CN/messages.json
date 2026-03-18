@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Tools"
   },
+  "firstRun_stepPermissions": {
+    "message": "权限"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "主机权限"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox 需要明确授权才能让工具与网页交互。请授予访问权限，以便 AI 助手能够读取和操作页面内容。"
+  },
+  "firstRun_permissionsGranted": {
+    "message": "主机权限已授予 — 工具可以访问网页。"
+  },
+  "firstRun_permissionsGrant": {
+    "message": "授予权限"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "权限被拒绝。与网页交互的工具可能无法正常工作。您可以稍后在扩展程序的权限设置中授予此权限。"
+  },
   "firstRun_step2Title": {
     "message": "Connect Channels"
   },

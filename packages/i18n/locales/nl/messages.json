@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Hulpmiddelen"
   },
+  "firstRun_stepPermissions": {
+    "message": "Machtigingen"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Hostmachtigingen"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox vereist expliciete toestemming om tools met webpagina's te laten werken. Verleen toegang zodat de AI-assistent pagina-inhoud kan lezen en erop kan reageren."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Hostmachtigingen verleend — tools hebben toegang tot webpagina's."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Machtiging verlenen"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "Machtiging is geweigerd. Tools die met webpagina's werken, functioneren mogelijk niet. Je kunt dit later verlenen in de machtigingsinstellingen van de extensie."
+  },
   "firstRun_step2Title": {
     "message": "Kanalen verbinden"
   },
