@@ -25,6 +25,9 @@ const convertToFirefoxCompatibleManifest = (manifest: ManifestType) => {
     value => !['sidePanel', 'offscreen', 'debugger'].includes(value),
   );
 
+  // Use shorter name for Firefox (Mozilla enforces ≤50 char limit)
+  manifestCopy.name = '__MSG_extensionShortName__';
+
   delete manifestCopy.options_page;
   delete manifestCopy.side_panel;
   delete manifestCopy.oauth2;
@@ -35,7 +38,7 @@ const convertToFirefoxCompatibleManifest = (manifest: ManifestType) => {
     const action = manifest.action as { default_icon?: Record<string, string> } | undefined;
     manifestCopy.sidebar_action = {
       default_panel: sidePanel.default_path ?? 'side-panel/index.html',
-      default_title: '__MSG_extensionName__',
+      default_title: '__MSG_extensionShortName__',
       ...(action?.default_icon ? { default_icon: action.default_icon } : {}),
     };
   }

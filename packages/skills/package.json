@@ -1,6 +1,6 @@
 {
   "name": "@extension/skills",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "chrome extension - skill definitions and parser",
   "type": "module",
   "private": true,

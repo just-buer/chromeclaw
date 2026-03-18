@@ -125,6 +125,21 @@ describe('ManifestParserImpl — Firefox conversion', () => {
     expect(csp.extension_pages).toBe("script-src 'self' 'wasm-unsafe-eval'; object-src 'self'");
     expect(csp.extension_pages).not.toContain('img-src');
   });
+
+  it('overrides name to use extensionShortName for Firefox', () => {
+    const manifest = buildTestManifest();
+    const result = parseResult(manifest, true);
+
+    expect(result.name).toBe('__MSG_extensionShortName__');
+  });
+
+  it('uses extensionShortName for sidebar_action default_title', () => {
+    const manifest = buildTestManifest();
+    const result = parseResult(manifest, true);
+    const sidebar = result.sidebar_action as { default_title: string };
+
+    expect(sidebar.default_title).toBe('__MSG_extensionShortName__');
+  });
 });
 
 describe('ManifestParserImpl — Chrome passthrough', () => {

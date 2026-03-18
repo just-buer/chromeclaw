@@ -71,6 +71,19 @@ Object.defineProperty(globalThis, 'chrome', {
   configurable: true,
 });
 
+// Mock webextension-polyfill as a no-op (browser-firefox.ts uses a declare global)
+vi.mock('webextension-polyfill', () => ({ default: {} }));
+
+Object.defineProperty(globalThis, 'browser', {
+  value: {
+    tabs: {
+      captureVisibleTab: mockTabsCaptureVisibleTab,
+    },
+  },
+  writable: true,
+  configurable: true,
+});
+
 // ── Import after mocks ──
 // This will fail until browser-firefox.ts is created
 let executeBrowserFirefox: (args: Record<string, unknown>) => Promise<unknown>;

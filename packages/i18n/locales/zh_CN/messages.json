@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw - 浏览器中的个人AI助手 🦞"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw - 你的个人浏览器AI助手 🦞"
+  },
   "displayErrorInfo": {
     "message": "发生错误"
   },

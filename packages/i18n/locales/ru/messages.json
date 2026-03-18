@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw - Ваш персональный AI-ассистент в браузере. \uD83E\uDD9E"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw - AI-ассистент в браузере 🦞"
+  },
   "displayErrorInfo": {
     "message": "Произошла ошибка"
   },

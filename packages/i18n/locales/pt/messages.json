@@ -1,6 +1,7 @@
 {
   "extensionDescription": { "description": "Extension description", "message": "ChromeClaw - Seu assistente pessoal de IA no navegador. Qualquer SO. Qualquer Plataforma. 🦞" },
   "extensionName": { "description": "Extension name", "message": "ChromeClaw - Seu assistente pessoal de IA no navegador. 🦞" },
+  "extensionShortName": { "description": "Short extension name for Firefox (max 50 chars)", "message": "ChromeClaw - Assistente IA no Navegador 🦞" },
   "displayErrorInfo": { "message": "Ocorreu um erro" },
   "displayErrorDescription": { "message": "Desculpe, algo deu errado ao carregar a página." },
   "displayErrorDetailsInfo": { "message": "Detalhes do erro:" },

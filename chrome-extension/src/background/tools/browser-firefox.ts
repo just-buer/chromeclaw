@@ -7,6 +7,15 @@
 
 import type { BrowserArgs, ScreenshotResult } from './browser';
 
+// The `browser` global is provided by webextension-polyfill (imported in index.ts)
+// or natively by Firefox. We declare it loosely here since @types/webextension-polyfill
+// is not installed and `typeof chrome` doesn't include Firefox-only APIs like captureVisibleTab.
+declare const browser: {
+  tabs: {
+    captureVisibleTab: (windowId: number, options: { format: string }) => Promise<string>;
+  };
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -299,7 +308,19 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
     await chrome.tabs.update(args.tabId, { active: true });
   }
 
-  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  // Use the polyfill's browser.tabs.captureVisibleTab (Firefox native API).
+  // Fallback to chrome.tabs.captureVisibleTab for environments where the
+  // polyfill didn't wrap it (e.g. certain bundling edge cases).
+  const captureTab =
+    browser.tabs.captureVisibleTab ??
+    (chrome.tabs as unknown as { captureVisibleTab?: typeof browser.tabs.captureVisibleTab })
+      .captureVisibleTab;
+
+  if (!captureTab) {
+    return 'Error: Screenshot API is not available in this browser. captureVisibleTab is not supported.';
+  }
+
+  const dataUrl = await captureTab(tab.windowId, { format: 'png' });
 
   // Strip data URL prefix to get base64
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');

@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. 🦞"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw – KI-Assistent im Browser 🦞"
+  },
   "displayErrorInfo": {
     "message": "Fehler aufgetreten"
   },
