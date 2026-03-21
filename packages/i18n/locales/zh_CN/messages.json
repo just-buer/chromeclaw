@@ -869,6 +869,9 @@
   "tab_actions": {
     "message": "快捷操作"
   },
+  "tab_mcp": {
+    "message": "MCP 服务器"
+  },
   "tab_logs": {
     "message": "日志"
   },

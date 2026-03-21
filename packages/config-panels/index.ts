@@ -14,6 +14,7 @@ export { UsageDashboard } from './lib/usage-dashboard';
 export { LogViewer } from './lib/log-viewer';
 export { TelegramConfig } from './lib/telegram-config';
 export { WhatsAppConfig } from './lib/whatsapp-config';
+export { McpConfig } from './lib/mcp-config';
 
 // Shared tab definitions
 export { CONFIG_TAB_GROUPS } from './lib/tab-groups';

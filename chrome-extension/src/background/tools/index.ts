@@ -6,6 +6,7 @@
 import { agentsListToolDef } from './agents-list';
 import { browserToolDef } from './browser';
 import { debuggerToolDef } from './debugger';
+import { getRemoteMcpAgentTools } from './remote-mcp';
 import { deepResearchToolDef } from './deep-research';
 import { createDocumentToolDef } from './documents';
 import { executeJsToolDef, executeCustomTool } from './execute-js';
@@ -167,6 +168,16 @@ const getAgentTools = async (opts?: {
     }
   } catch (err) {
     toolLog.warn('Failed to load custom tools', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Inject remote MCP server tools
+  try {
+    const mcpTools = await getRemoteMcpAgentTools();
+    tools.push(...mcpTools);
+  } catch (err) {
+    toolLog.warn('Failed to load remote MCP tools', {
       error: err instanceof Error ? err.message : String(err),
     });
   }

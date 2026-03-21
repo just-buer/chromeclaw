@@ -869,6 +869,9 @@
   "tab_actions": {
     "message": "Acciones"
   },
+  "tab_mcp": {
+    "message": "Servidores MCP"
+  },
   "tab_logs": {
     "message": "Registros"
   },

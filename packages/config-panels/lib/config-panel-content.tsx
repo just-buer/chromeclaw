@@ -14,6 +14,7 @@ import { UsageDashboard } from './usage-dashboard';
 import { LogViewer } from './log-viewer';
 import { TelegramConfig } from './telegram-config';
 import { WhatsAppConfig } from './whatsapp-config';
+import { McpConfig } from './mcp-config';
 
 const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTabId; onOpenSession?: (chatId: string) => void }) => (
   <>
@@ -27,6 +28,7 @@ const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTab
         <TextToSpeechConfig />
       </>
     )}
+    {activeTab === 'mcp' && <McpConfig />}
     {activeTab === 'actions' && <SuggestedActionsConfig />}
     {activeTab === 'skills' && <SkillConfig />}
     {activeTab === 'agents' && <AgentsConfig />}

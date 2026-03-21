@@ -869,6 +869,9 @@
   "tab_actions": {
     "message": "Acties"
   },
+  "tab_mcp": {
+    "message": "MCP-servers"
+  },
   "tab_logs": {
     "message": "Logboeken"
   },

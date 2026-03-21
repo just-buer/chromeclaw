@@ -28,3 +28,4 @@ export {
   type EmbeddingProviderType,
 } from './embedding-config-storage.js';
 export { webCredentialsStorage, type WebProviderCredential } from './web-credentials-storage.js';
+export { mcpServersStorage, type McpServerConfig } from './mcp-servers-storage.js';

@@ -869,6 +869,9 @@
   "tab_actions": {
     "message": "アクション"
   },
+  "tab_mcp": {
+    "message": "MCPサーバー"
+  },
   "tab_logs": {
     "message": "ログ"
   },
