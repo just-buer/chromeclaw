@@ -8,19 +8,19 @@ import { browserToolDef } from './browser';
 import { debuggerToolDef } from './debugger';
 import { deepResearchToolDef } from './deep-research';
 import { createDocumentToolDef } from './documents';
-import { executeJsToolDef } from './execute-js';
-import { executeCustomTool } from './execute-js';
+import { executeJsToolDef, executeCustomTool } from './execute-js';
 import { calendarToolDefs } from './google-calendar';
 import { driveToolDefs } from './google-drive';
 import { gmailToolDefs } from './google-gmail';
 import { memoryToolDefs } from './memory-tools';
 import { schedulerToolDef } from './scheduler';
 import { subagentToolDefs } from './subagent';
+import { defaultFormatResult } from './tool-registration';
 import { webFetchToolDef } from './web-fetch';
 import { webSearchToolDef } from './web-search';
 import { workspaceToolDefs } from './workspace';
-import { defaultFormatResult } from './tool-registration';
 import { createLogger } from '../logging/logger-buffer';
+import { IS_FIREFOX } from '@extension/env';
 import { toolConfigStorage, activeAgentStorage, getAgent } from '@extension/storage';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
@@ -69,13 +69,9 @@ const toolLookup = new Map<string, ToolRegistration['execute']>(
   ALL_TOOLS.map(t => [t.name, t.execute]),
 );
 
-const schemaLookup = new Map<string, TObject>(
-  ALL_TOOLS.map(t => [t.name, t.schema]),
-);
+const schemaLookup = new Map<string, TObject>(ALL_TOOLS.map(t => [t.name, t.schema]));
 
-const registrationLookup = new Map<string, ToolRegistration>(
-  ALL_TOOLS.map(t => [t.name, t]),
-);
+const registrationLookup = new Map<string, ToolRegistration>(ALL_TOOLS.map(t => [t.name, t]));
 
 // ---------------------------------------------------------------------------
 // Custom tool schema builder
@@ -127,6 +123,8 @@ const getAgentTools = async (opts?: {
   for (const def of ALL_TOOLS) {
     // Check if enabled
     if (!(config.enabledTools[def.name] ?? false)) continue;
+    // Exclude Chrome-only tools on Firefox
+    if (def.chromeOnly && IS_FIREFOX) continue;
     // Exclude headless-incompatible tools when in headless mode
     if (def.excludeInHeadless && opts?.headless) continue;
 
@@ -254,8 +252,20 @@ const executeTool = async (
  */
 const getToolConfig = async (): Promise<ToolConfig> => toolConfigStorage.get();
 
-/** Returns the set of tool names that have actual implementations (schemas + executors). */
-const getImplementedToolNames = (): Set<string> => new Set(schemaLookup.keys());
+/** Returns the set of tool names that have actual implementations (schemas + executors).
+ *  Chrome-only tools are excluded on Firefox. */
+const getImplementedToolNames = (): Set<string> => {
+  if (IS_FIREFOX) {
+    const names = new Set<string>();
+    for (const def of ALL_TOOLS) {
+      if (!def.chromeOnly) {
+        names.add(def.name);
+      }
+    }
+    return names;
+  }
+  return new Set(schemaLookup.keys());
+};
 
 export {
   getAgentTools,

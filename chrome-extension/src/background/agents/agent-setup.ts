@@ -29,6 +29,7 @@ import {
   updateSessionTokens,
 } from '@extension/storage';
 import { nanoid } from 'nanoid';
+import { IS_FIREFOX } from '@extension/env';
 import type { ErrorCategory } from '../errors/error-classification';
 import type { ChatModel, ChatMessagePart, ModelApi, ModelProvider } from '@extension/shared';
 import type { DbChatModel, DbChat } from '@extension/storage';
@@ -350,15 +351,29 @@ const executeAttempt = async (opts: {
     agentLog.warn('Agent timeout', { timeoutMs });
     internalController.abort();
   }, timeoutMs);
+  agentLog.trace('Agent timeout set', { timeoutMs });
 
-  internalController.signal.addEventListener('abort', () => agent.abort(), { once: true });
+  internalController.signal.addEventListener(
+    'abort',
+    () => {
+      agentLog.trace('Agent abort signal fired', { timedOut });
+      agent.abort();
+    },
+    { once: true },
+  );
 
   // Run the agent
+  agentLog.trace('Agent prompt starting', {
+    modelId: model.id,
+    toolCount: tools.length,
+    hasSignal: !!signal,
+  });
   if (typeof prompt === 'string') {
     await agent.prompt(prompt);
   } else {
     await agent.prompt(prompt);
   }
+  agentLog.trace('Agent prompt completed', { stepCount, timedOut });
 
   clearTimeout(timer);
 
@@ -634,6 +649,7 @@ export const buildHeadlessSystemPrompt = async (
     runtimeMeta: {
       modelName: model.name,
       currentDate: new Date().toISOString().split('T')[0],
+      browser: IS_FIREFOX ? 'firefox' : 'chrome',
     },
   };
 

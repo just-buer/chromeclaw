@@ -107,6 +107,7 @@ const debuggerToolDef: ToolRegistration = {
   description:
     'Send Chrome DevTools Protocol (CDP) commands to browser tabs. Actions: send (execute a CDP command), attach/detach (manage debugger session), list_targets (list debuggable targets).',
   schema: debuggerSchema,
+  chromeOnly: true,
   execute: args => executeDebugger(args as DebuggerArgs),
 };
 

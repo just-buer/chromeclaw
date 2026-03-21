@@ -1,4 +1,5 @@
 import 'webextension-polyfill';
+import { handleLLMStream } from './agents/stream-handler';
 import { initChannels, validateChannelAuth, toggleChannel } from './channels';
 import { saveChannelConfig, getChannelConfig, createDefaultChannelConfig } from './channels/config';
 import {
@@ -21,10 +22,15 @@ import {
   registerStreamPort,
 } from './logging/logger-buffer';
 import { runSessionJournal } from './memory/memory-journal';
-import { handleLLMStream } from './agents/stream-handler';
 import { setCronServiceRef } from './tools/scheduler';
+import { createKeepAliveManager } from './utils/keep-alive';
+import { initSidePanelBehavior } from '@extension/shared';
 import { getScheduledTask } from '@extension/storage';
 import type { LLMRequestMessage } from '@extension/shared';
+
+// ── Port Listener for LLM Streaming ───────────
+
+// ── Side Panel Behavior ────────────────────────
 
 // ── Loggers ─────────────────────────────────
 const cronLog = createLogger('cron');
@@ -40,42 +46,51 @@ const cronService = new CronService({
 
 setCronServiceRef(cronService);
 
-// Start cron after a short delay to let storage initialize
-setTimeout(() => {
+// Start cron — use microtask to avoid setTimeout race with Firefox event page suspension.
+// IndexedDB is available immediately; the 1-second delay was unnecessary and risky.
+Promise.resolve().then(() =>
   cronService.start().catch(err => {
     cronLog.error('Failed to start cron service', { error: String(err) });
-  });
-}, 1000);
+  }),
+);
 
 // ── Strip CORP headers for extension image loads ──
 // Google CDN (and other servers) set Cross-Origin-Resource-Policy: same-site,
 // which blocks <img> loads from chrome-extension:// pages.
 // This dynamic rule removes that header for image requests initiated by the extension.
+// NOTE: Use string literals for action type / header operation / resource type —
+// Firefox does not expose the Chrome-style enum objects (RuleActionType, HeaderOperation, etc.).
 const CORP_STRIP_RULE_ID = 9999;
-chrome.declarativeNetRequest.updateDynamicRules({
-  removeRuleIds: [CORP_STRIP_RULE_ID],
-  addRules: [
-    {
-      id: CORP_STRIP_RULE_ID,
-      priority: 1,
-      action: {
-        type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-        responseHeaders: [
-          {
-            header: 'Cross-Origin-Resource-Policy',
-            operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE,
+try {
+  chrome.declarativeNetRequest
+    .updateDynamicRules({
+      removeRuleIds: [CORP_STRIP_RULE_ID],
+      addRules: [
+        {
+          id: CORP_STRIP_RULE_ID,
+          priority: 1,
+          action: {
+            type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+            responseHeaders: [
+              {
+                header: 'Cross-Origin-Resource-Policy',
+                operation: 'remove' as chrome.declarativeNetRequest.HeaderOperation,
+              },
+            ],
           },
-        ],
-      },
-      condition: {
-        resourceTypes: [chrome.declarativeNetRequest.ResourceType.IMAGE],
-        initiatorDomains: [chrome.runtime.id],
-      },
-    },
-  ],
-}).catch(err => {
-  console.error('[corp-strip] Failed to register CORP header rule:', err);
-});
+          condition: {
+            resourceTypes: ['image' as chrome.declarativeNetRequest.ResourceType],
+            initiatorDomains: [chrome.runtime.id],
+          },
+        },
+      ],
+    })
+    .catch(err => {
+      console.error('[corp-strip] Failed to register CORP header rule:', err);
+    });
+} catch (err) {
+  console.error('[corp-strip] Failed to create CORP header rule:', err);
+}
 
 // ── Message Handlers ───────────────────────────
 
@@ -208,8 +223,13 @@ const messageHandlers: Record<string, MessageHandler> = {
     if (!chatId) return { error: 'chatId is required' };
     const agentId = (request.agentId as string) || undefined;
     cronLog.debug('Session journal requested', { chatId, agentId });
-    const result = await runSessionJournal({ chatId, agentId });
-    return { result };
+    streamKeepAlive.acquire();
+    try {
+      const result = await runSessionJournal({ chatId, agentId });
+      return { result };
+    } finally {
+      streamKeepAlive.release();
+    }
   },
 
   CRON_STATUS: async () => {
@@ -282,38 +302,44 @@ const messageHandlers: Record<string, MessageHandler> = {
     if (!chatId || !modelConfig) return { error: 'chatId and modelConfig are required' };
 
     slashCmdLog.trace('COMPACT_REQUEST received', { chatId, modelId: modelConfig.id });
-
-    const { getMessagesByChatId, getChat, updateCompactionSummary, incrementCompactionCount, getEnabledWorkspaceFiles } =
-      await import('@extension/storage');
-    const { compactMessagesWithSummary } = await import('./context/compaction');
-    const { enforceToolResultBudget } = await import('./context/tool-result-context-guard');
-    const { extractCriticalRules } = await import('./context/summarizer');
-    const { buildHeadlessSystemPrompt } = await import('./agents/agent-setup');
-    const { getProviderTokenLimit } = await import('./context/provider-limit-cache');
-
-    const [messages, chat] = await Promise.all([getMessagesByChatId(chatId), getChat(chatId)]);
-    slashCmdLog.debug('Loaded messages for compaction', { chatId, messageCount: messages.length });
-    if (messages.length <= 2) return { error: 'Not enough messages to compact' };
-
-    // Build system prompt to get accurate token count (same as stream-handler.ts)
-    const agentId = chat?.agentId ?? 'main';
-    const systemPrompt = await buildHeadlessSystemPrompt(modelConfig, agentId);
-    const systemPromptTokens = Math.ceil(systemPrompt.length / 4);
-
-    // Use the lower of model contextWindow and any detected provider limit
-    const cachedLimit = getProviderTokenLimit(modelConfig.id);
-    const effectiveContextWindow =
-      cachedLimit && modelConfig.contextWindow
-        ? Math.min(cachedLimit, modelConfig.contextWindow)
-        : cachedLimit ?? modelConfig.contextWindow;
-
-    slashCmdLog.trace('COMPACT_REQUEST: effective context window', {
-      cachedLimit,
-      modelContextWindow: modelConfig.contextWindow,
-      effectiveContextWindow,
-    });
+    streamKeepAlive.acquire();
 
     try {
+      const {
+        getMessagesByChatId,
+        getChat,
+        updateCompactionSummary,
+        incrementCompactionCount,
+        getEnabledWorkspaceFiles,
+      } = await import('@extension/storage');
+      const { compactMessagesWithSummary } = await import('./context/compaction');
+      const { enforceToolResultBudget } = await import('./context/tool-result-context-guard');
+      const { extractCriticalRules } = await import('./context/summarizer');
+      const { buildHeadlessSystemPrompt } = await import('./agents/agent-setup');
+      const { getProviderTokenLimit } = await import('./context/provider-limit-cache');
+
+      const [messages, chat] = await Promise.all([getMessagesByChatId(chatId), getChat(chatId)]);
+      slashCmdLog.debug('Loaded messages for compaction', { chatId, messageCount: messages.length });
+      if (messages.length <= 2) return { error: 'Not enough messages to compact' };
+
+      // Build system prompt to get accurate token count (same as stream-handler.ts)
+      const agentId = chat?.agentId ?? 'main';
+      const systemPrompt = await buildHeadlessSystemPrompt(modelConfig, agentId);
+      const systemPromptTokens = Math.ceil(systemPrompt.length / 4);
+
+      // Use the lower of model contextWindow and any detected provider limit
+      const cachedLimit = getProviderTokenLimit(modelConfig.id);
+      const effectiveContextWindow =
+        cachedLimit && modelConfig.contextWindow
+          ? Math.min(cachedLimit, modelConfig.contextWindow)
+          : (cachedLimit ?? modelConfig.contextWindow);
+
+      slashCmdLog.trace('COMPACT_REQUEST: effective context window', {
+        cachedLimit,
+        modelContextWindow: modelConfig.contextWindow,
+        effectiveContextWindow,
+      });
+
       // Pre-compaction: enforce tool result budget (same as transform.ts auto-compaction path)
       const guarded = enforceToolResultBudget(
         messages as import('@extension/shared').ChatMessage[],
@@ -325,18 +351,13 @@ const messageHandlers: Record<string, MessageHandler> = {
       const workspaceFiles = await getEnabledWorkspaceFiles(agentId);
       const criticalRules = extractCriticalRules(workspaceFiles);
 
-      const result = await compactMessagesWithSummary(
-        guarded,
-        modelConfig.id,
-        modelConfig,
-        {
-          existingSummary: chat?.compactionSummary,
-          systemPromptTokens,
-          contextWindowOverride: effectiveContextWindow,
-          force: true,
-          criticalRules,
-        },
-      );
+      const result = await compactMessagesWithSummary(guarded, modelConfig.id, modelConfig, {
+        existingSummary: chat?.compactionSummary,
+        systemPromptTokens,
+        contextWindowOverride: effectiveContextWindow,
+        force: true,
+        criticalRules,
+      });
 
       if (!result.wasCompacted) {
         // force compaction was requested but nothing was compacted — this can happen
@@ -352,7 +373,10 @@ const messageHandlers: Record<string, MessageHandler> = {
         keptMessages: result.messages.length,
         tokensBefore: result.tokensBefore,
         tokensAfter: result.tokensAfter,
-        tokensSaved: result.tokensBefore && result.tokensAfter ? result.tokensBefore - result.tokensAfter : undefined,
+        tokensSaved:
+          result.tokensBefore && result.tokensAfter
+            ? result.tokensBefore - result.tokensAfter
+            : undefined,
         messagesDropped: result.messagesDropped,
         durationMs: result.durationMs,
       });
@@ -379,6 +403,8 @@ const messageHandlers: Record<string, MessageHandler> = {
     } catch (err) {
       slashCmdLog.error('Compaction failed', { chatId, error: String(err) });
       throw err;
+    } finally {
+      streamKeepAlive.release();
     }
   },
 };
@@ -400,10 +426,7 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-// ── Port Listener for LLM Streaming ───────────
-
-const KEEP_ALIVE_ALARM = 'keep-alive';
-let activeStreams = 0;
+const streamKeepAlive = createKeepAliveManager('keep-alive');
 
 chrome.runtime.onConnect.addListener(port => {
   if (port.name === 'log-stream') {
@@ -412,17 +435,10 @@ chrome.runtime.onConnect.addListener(port => {
   }
 
   if (port.name === 'llm-stream') {
-    activeStreams++;
-    // Keep service worker alive during streaming
-    if (activeStreams === 1) {
-      chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.4 });
-    }
+    streamKeepAlive.acquire();
 
     port.onDisconnect.addListener(() => {
-      activeStreams = Math.max(0, activeStreams - 1);
-      if (activeStreams === 0) {
-        chrome.alarms.clear(KEEP_ALIVE_ALARM);
-      }
+      streamKeepAlive.release();
     });
 
     port.onMessage.addListener((msg: Record<string, unknown>) => {
@@ -485,12 +501,14 @@ chrome.runtime.onMessage.addListener(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: unknown) => void,
   ) => {
-    // Only handle messages originating from the offscreen document, not our own
+    // Only handle messages originating from the offscreen/worker document, not our own
     // broadcasts back to extension pages. Offscreen senders have sender.url set
     // to the offscreen HTML page; the SW broadcasting to itself has no url.
+    // On Firefox, workers run in a hidden popup window with the same page URL.
     const senderUrl = sender.url ?? '';
     const isFromOffscreen =
       sender.id === chrome.runtime.id && senderUrl.includes('offscreen-channels');
+    const isFromWorkerRouter = message._source === 'worker-router';
 
     if (typeof message.type === 'string') {
       const type = message.type;
@@ -502,7 +520,7 @@ chrome.runtime.onMessage.addListener(
         type === 'WA_CONNECTION_STATUS' ||
         type === 'WA_DEBUG'
       ) {
-        if (!isFromOffscreen) {
+        if (!isFromOffscreen && !isFromWorkerRouter) {
           // This is our own broadcast echoing back — ignore it
           return false;
         }
@@ -522,8 +540,4 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-// ── Side Panel Behavior ────────────────────────
-
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
-  // Ignore errors in environments that don't support sidePanel
-});
+initSidePanelBehavior();

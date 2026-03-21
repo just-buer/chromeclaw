@@ -34,6 +34,7 @@ import {
   Loader2Icon,
   RocketIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   SearchIcon,
   LinkIcon,
   FileTextIcon,
@@ -52,6 +53,8 @@ import {
   CalendarIcon,
   ZapIcon,
 } from 'lucide-react';
+import { parseSkillFrontmatter } from '@extension/shared';
+import { IS_FIREFOX } from '@extension/env';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from '@extension/i18n';
@@ -80,14 +83,10 @@ const providers = [
   { value: 'web', label: 'Web (Browser Session Zero Token)', defaultModel: '', defaultBase: '' },
 ];
 
-const TOTAL_STEPS = 5;
-const STEP_LABELS = [
-  'firstRun_stepModel',
-  'firstRun_stepChannels',
-  'firstRun_stepAgent',
-  'firstRun_stepTools',
-  'firstRun_stepSkills',
-] as const;
+const TOTAL_STEPS = IS_FIREFOX ? 6 : 5;
+const STEP_LABELS = IS_FIREFOX
+  ? (['firstRun_stepModel', 'firstRun_stepPermissions', 'firstRun_stepChannels', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const)
+  : (['firstRun_stepModel', 'firstRun_stepChannels', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const);
 
 /** Groups to exclude from the onboarding tool picker (require OAuth or feature flags). */
 const EXCLUDED_TOOL_GROUPS = new Set(['gmail', 'calendar', 'drive']);
@@ -424,6 +423,98 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
           {saving && <Loader2Icon className="mr-2 size-4 animate-spin" />}
           {t('firstRun_next')}
         </Button>
+      </CardContent>
+    </div>
+  );
+};
+
+/* ---------- Firefox Permissions Step ---------- */
+
+const StepFirefoxPermissions = ({
+  onNext,
+  onBack,
+  t,
+}: {
+  onNext: () => void;
+  onBack: () => void;
+  t: TFunction;
+}) => {
+  const [granted, setGranted] = useState<boolean | null>(null);
+  const [denied, setDenied] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+
+  useEffect(() => {
+    chrome.permissions
+      .contains({ origins: ['<all_urls>'] })
+      .then(has => setGranted(has))
+      .catch(() => setGranted(false));
+  }, []);
+
+  const handleGrant = useCallback(async () => {
+    setRequesting(true);
+    setDenied(false);
+    try {
+      const result = await chrome.permissions.request({ origins: ['<all_urls>'] });
+      setGranted(result);
+      if (!result) setDenied(true);
+    } catch {
+      setDenied(true);
+    } finally {
+      setRequesting(false);
+    }
+  }, []);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <CardHeader className="text-center">
+        <CardTitle className="flex items-center justify-center gap-2 text-xl">
+          <ShieldCheckIcon className="size-5" />
+          {t('firstRun_permissionsTitle')}
+        </CardTitle>
+        <CardDescription>{t('firstRun_permissionsDescription')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+        {granted === null ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2Icon className="text-muted-foreground size-5 animate-spin" />
+          </div>
+        ) : granted ? (
+          <div className="flex items-center gap-2 rounded-md bg-green-500/10 px-3 py-2 text-sm text-green-600 dark:text-green-400">
+            <CheckIcon className="size-4" />
+            {t('firstRun_permissionsGranted')}
+          </div>
+        ) : (
+          <>
+            <Button
+              className="w-full"
+              disabled={requesting}
+              onClick={handleGrant}>
+              {requesting && <Loader2Icon className="mr-2 size-4 animate-spin" />}
+              <ShieldCheckIcon className="mr-2 size-4" />
+              {t('firstRun_permissionsGrant')}
+            </Button>
+            {denied && (
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                {t('firstRun_permissionsDenied')}
+              </p>
+            )}
+          </>
+        )}
+
+        <div className="mt-auto flex items-center justify-between">
+          <Button
+            data-testid="setup-back-button"
+            onClick={onBack}
+            variant="link">
+            <ChevronLeftIcon className="mr-1 size-4" />
+            {t('firstRun_back')}
+          </Button>
+          <Button
+            data-testid="setup-next-button"
+            onClick={onNext}>
+            {t('firstRun_next')}
+          </Button>
+        </div>
       </CardContent>
     </div>
   );
@@ -930,9 +1021,13 @@ const Step5SkillsSetup = ({
 
 /* ---------- Main Wizard ---------- */
 
+/** Offset for step numbers, accounting for the Firefox permissions step. */
+const STEP_OFFSET = IS_FIREFOX ? 1 : 0;
+
 const FirstRunSetup = ({ onComplete }: FirstRunSetupProps) => {
   const t = useT();
   const [step, setStep] = useState(1);
+  const offset = STEP_OFFSET;
 
   const handleSkipSetup = useCallback(async () => {
     await ensureDefaultAgent();
@@ -948,18 +1043,19 @@ const FirstRunSetup = ({ onComplete }: FirstRunSetupProps) => {
 
         <div key={step} className="animate-in fade-in flex flex-1 flex-col duration-200">
           {step === 1 && <Step1ModelSetup onNext={() => setStep(2)} t={t} />}
-          {step === 2 && (
-            <Step2ChannelSetup onBack={() => setStep(1)} onNext={() => setStep(3)} t={t} />
+          {IS_FIREFOX && step === 2 && (
+            <StepFirefoxPermissions onBack={() => setStep(1)} onNext={() => setStep(3)} t={t} />
           )}
-          {step === 3 && (
-            <Step3AgentSetup onBack={() => setStep(2)} onNext={() => setStep(4)} t={t} />
+          {step === 2 + offset && (
+            <Step2ChannelSetup onBack={() => setStep(1 + offset)} onNext={() => setStep(3 + offset)} t={t} />
           )}
-          {step === 4 && (
-            <Step4ToolsSetup onBack={() => setStep(3)} onNext={() => setStep(5)} t={t} />
+          {step === 3 + offset && (
+            <Step3AgentSetup onBack={() => setStep(2 + offset)} onNext={() => setStep(4 + offset)} t={t} />
           )}
-          {step === 5 && (
-            <Step5SkillsSetup onBack={() => setStep(4)} onComplete={onComplete} t={t} />
+          {step === 4 + offset && (
+            <Step4ToolsSetup onBack={() => setStep(3 + offset)} onNext={() => setStep(5 + offset)} t={t} />
           )}
+          {step === 5 + offset && <Step5SkillsSetup onBack={() => setStep(4 + offset)} onComplete={onComplete} t={t} />}
         </div>
 
         <div className="flex items-center justify-between px-6 pb-6 pt-2">

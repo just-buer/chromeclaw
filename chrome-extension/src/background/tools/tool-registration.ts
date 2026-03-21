@@ -35,6 +35,8 @@ interface ToolRegistration {
   schema: TObject;
   /** If true, this tool is excluded when running in headless mode */
   excludeInHeadless?: boolean;
+  /** If true, this tool is Chrome-only and excluded on Firefox */
+  chromeOnly?: boolean;
   /** If true, executor receives { chatId } context */
   needsContext?: boolean;
   /** Raw executor: (args, context?) → result */

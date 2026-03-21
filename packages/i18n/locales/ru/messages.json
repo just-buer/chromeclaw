@@ -70,6 +70,24 @@
   "firstRun_stepTools": {
     "message": "Инструменты"
   },
+  "firstRun_stepPermissions": {
+    "message": "Разрешения"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Разрешения хоста"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox требует явного разрешения для взаимодействия инструментов с веб-страницами. Предоставьте доступ, чтобы ИИ-ассистент мог читать содержимое страниц и работать с ним."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Разрешения хоста предоставлены — инструменты могут обращаться к веб-страницам."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Предоставить разрешение"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "Разрешение отклонено. Инструменты, взаимодействующие с веб-страницами, могут не работать. Вы можете предоставить разрешение позже в настройках расширения."
+  },
   "firstRun_step2Title": {
     "message": "Подключение каналов"
   },

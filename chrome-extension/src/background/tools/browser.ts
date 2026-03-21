@@ -1,8 +1,12 @@
 import { cdpSend } from './cdp';
 import { sanitizeImage } from './image-sanitization';
+import { IS_FIREFOX } from '@extension/env';
 import { Type } from '@sinclair/typebox';
 import type { SanitizedImage } from './image-sanitization';
+import type { ToolRegistration, ToolResult } from './tool-registration';
 import type { Static } from '@sinclair/typebox';
+
+// ── Tool registration ──
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -229,76 +233,81 @@ const ensureAttached = async (tabId: number): Promise<string | null> => {
 
 // ---------------------------------------------------------------------------
 // Debugger event listeners (registered once at module load)
+// Firefox does not have chrome.debugger — skip registration entirely.
 // ---------------------------------------------------------------------------
 
-chrome.debugger.onDetach.addListener((source, _reason) => {
-  if (source.tabId != null) {
-    attachFailureCache.delete(source.tabId);
-    cleanupSession(source.tabId);
-  }
-});
+if (!IS_FIREFOX) {
+  chrome.debugger.onDetach.addListener((source, _reason) => {
+    if (source.tabId != null) {
+      attachFailureCache.delete(source.tabId);
+      cleanupSession(source.tabId);
+    }
+  });
 
-chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (source.tabId == null) return;
-  const session = sessions.get(source.tabId);
-  if (!session) return;
+  chrome.debugger.onEvent.addListener((source, method, params) => {
+    if (source.tabId == null) return;
+    const session = sessions.get(source.tabId);
+    if (!session) return;
 
-  const p = params as Record<string, unknown>;
+    const p = params as Record<string, unknown>;
 
-  if (method === 'Runtime.consoleAPICalled') {
-    const args = (p.args as Array<{ type: string; value?: unknown; description?: string }>) ?? [];
-    const text = args.map(a => a.description ?? a.value ?? '').join(' ');
-    pushToRingBuffer(session.consoleLogs, {
-      type: (p.type as string) ?? 'log',
-      text,
-      timestamp: Date.now(),
-    });
-  }
-
-  if (method === 'Network.requestWillBeSent') {
-    const request = p.request as { method?: string; url?: string } | undefined;
-    if (request) {
-      pushToRingBuffer(session.networkRequests, {
-        method: request.method ?? 'GET',
-        url: request.url ?? '',
+    if (method === 'Runtime.consoleAPICalled') {
+      const args = (p.args as Array<{ type: string; value?: unknown; description?: string }>) ?? [];
+      const text = args.map(a => a.description ?? a.value ?? '').join(' ');
+      pushToRingBuffer(session.consoleLogs, {
+        type: (p.type as string) ?? 'log',
+        text,
         timestamp: Date.now(),
       });
     }
-  }
 
-  if (method === 'Network.responseReceived') {
-    const response = p.response as { url?: string; status?: number; mimeType?: string } | undefined;
-    if (response) {
-      // Update the last matching request with status
-      for (let i = session.networkRequests.length - 1; i >= 0; i--) {
-        if (
-          session.networkRequests[i].url === response.url &&
-          session.networkRequests[i].status == null
-        ) {
-          session.networkRequests[i].status = response.status;
-          session.networkRequests[i].type = response.mimeType;
-          break;
+    if (method === 'Network.requestWillBeSent') {
+      const request = p.request as { method?: string; url?: string } | undefined;
+      if (request) {
+        pushToRingBuffer(session.networkRequests, {
+          method: request.method ?? 'GET',
+          url: request.url ?? '',
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    if (method === 'Network.responseReceived') {
+      const response = p.response as
+        | { url?: string; status?: number; mimeType?: string }
+        | undefined;
+      if (response) {
+        // Update the last matching request with status
+        for (let i = session.networkRequests.length - 1; i >= 0; i--) {
+          if (
+            session.networkRequests[i].url === response.url &&
+            session.networkRequests[i].status == null
+          ) {
+            session.networkRequests[i].status = response.status;
+            session.networkRequests[i].type = response.mimeType;
+            break;
+          }
         }
       }
     }
-  }
-});
+  });
 
-// Cleanup session when tab is closed
-chrome.tabs.onRemoved.addListener(tabId => {
-  attachFailureCache.delete(tabId);
-  if (sessions.has(tabId)) {
-    try {
-      chrome.debugger.detach({ tabId }, () => {
-        // Ignore errors — tab is already gone
-        void chrome.runtime.lastError;
-      });
-    } catch {
-      // ignore
+  // Cleanup session when tab is closed
+  chrome.tabs.onRemoved.addListener(tabId => {
+    attachFailureCache.delete(tabId);
+    if (sessions.has(tabId)) {
+      try {
+        chrome.debugger.detach({ tabId }, () => {
+          // Ignore errors — tab is already gone
+          void chrome.runtime.lastError;
+        });
+      } catch {
+        // ignore
+      }
+      cleanupSession(tabId);
     }
-    cleanupSession(tabId);
-  }
-});
+  });
+} // end if (!IS_FIREFOX)
 
 // ---------------------------------------------------------------------------
 // Wait helpers
@@ -1075,6 +1084,12 @@ const handleNetwork = async (args: BrowserArgs): Promise<string> => {
 // ---------------------------------------------------------------------------
 
 const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotResult> => {
+  // Firefox: delegate to scripting-based implementation (no chrome.debugger)
+  if (IS_FIREFOX) {
+    const { executeBrowserFirefox } = await import('./browser-firefox');
+    return executeBrowserFirefox(args);
+  }
+
   try {
     switch (args.action) {
       case 'tabs':
@@ -1145,9 +1160,6 @@ export type {
   ConsoleEntry,
   NetworkEntry,
 };
-
-// ── Tool registration ──
-import type { ToolRegistration, ToolResult } from './tool-registration';
 
 const browserToolDef: ToolRegistration = {
   name: 'browser',
