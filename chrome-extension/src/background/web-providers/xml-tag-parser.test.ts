@@ -188,6 +188,21 @@ describe('createXmlTagParser', () => {
     ]);
   });
 
+  it('flush() strips incomplete closing tag (e.g. GLM sends "</tool_call" without ">")', () => {
+    const parser = createXmlTagParser();
+    parser.feed('<tool_call id="search001" name="web_search">');
+    parser.feed('\n{"query": "小红书 热帖"}\n</tool_call');
+    const events = parser.flush();
+    expect(events).toEqual([
+      {
+        type: 'tool_call',
+        id: 'search001',
+        name: 'web_search',
+        arguments: { query: '小红书 热帖' },
+      },
+    ]);
+  });
+
   it('buffers attribute-based tool_call tag arriving in small chunks', () => {
     const parser = createXmlTagParser();
 

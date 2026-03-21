@@ -274,6 +274,8 @@ const createXmlTagParser = (): {
     } else if (state === 'tool_call') {
       toolCallBuffer += buffer;
       buffer = '';
+      // Strip trailing incomplete closing tag (e.g. GLM sends "</tool_call" without ">")
+      toolCallBuffer = toolCallBuffer.replace(/<\/tool_call[^>]*$/i, '');
       if (toolCallBuffer) {
         // Try parsing the buffer — some models (e.g. Qwen) omit the closing </tool_call> tag
         const event = parseToolCallJson(toolCallBuffer);
