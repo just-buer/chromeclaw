@@ -847,6 +847,9 @@
   "tab_actions": {
     "message": "Actions"
   },
+  "tab_mcp": {
+    "message": "Serveurs MCP"
+  },
   "tab_logs": {
     "message": "Journaux"
   },

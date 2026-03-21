@@ -850,6 +850,9 @@
   "tab_logs": {
     "message": "Logs"
   },
+  "tab_mcp": {
+    "message": "MCP Servers"
+  },
   "whatsapp_title": {
     "message": "WhatsApp"
   },

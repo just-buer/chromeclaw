@@ -252,6 +252,9 @@
   "tab_general": { "message": "Geral" },
   "tab_models": { "message": "Modelos" },
   "tab_actions": { "message": "Ações" },
+  "tab_mcp": {
+    "message": "Servidores MCP"
+  },
   "tab_logs": { "message": "Logs" },
   "whatsapp_title": { "message": "WhatsApp" },
   "whatsapp_description": { "message": "Conecte o WhatsApp para conversar com seu assistente de IA pelo celular. Usa o protocolo WhatsApp Web — nenhum servidor externo necessário." },

@@ -847,6 +847,9 @@
   "tab_actions": {
     "message": "Aktionen"
   },
+  "tab_mcp": {
+    "message": "MCP-Server"
+  },
   "tab_logs": {
     "message": "Protokolle"
   },
