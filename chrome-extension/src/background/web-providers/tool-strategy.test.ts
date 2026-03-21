@@ -11,6 +11,7 @@ import {
   claudeToolStrategy,
   kimiToolStrategy,
   glmToolStrategy,
+  geminiToolStrategy,
 } from './tool-strategy';
 
 // ── Factory ──────────────────────────────────────
@@ -38,6 +39,10 @@ describe('getToolStrategy', () => {
 
   it('returns kimi strategy for kimi-web', () => {
     expect(getToolStrategy('kimi-web')).toBe(kimiToolStrategy);
+  });
+
+  it('returns gemini strategy for gemini-web', () => {
+    expect(getToolStrategy('gemini-web')).toBe(geminiToolStrategy);
   });
 });
 
@@ -579,6 +584,78 @@ describe('glmToolStrategy', () => {
       expect(result).not.toContain('<think>');
       expect(result).toBe('Hello');
     });
+  });
+});
+
+// ── Gemini Strategy ──────────────────────────────
+
+describe('geminiToolStrategy', () => {
+  it('shares same buildToolPrompt format as qwen (markdown)', () => {
+    const tools = [
+      {
+        name: 'test',
+        description: 'A test tool',
+        parameters: { type: 'object', properties: {} },
+      },
+    ];
+    expect(geminiToolStrategy.buildToolPrompt(tools)).toBe(
+      qwenToolStrategy.buildToolPrompt(tools),
+    );
+  });
+
+  it('returns empty string for no tools', () => {
+    expect(geminiToolStrategy.buildToolPrompt([])).toBe('');
+  });
+
+  describe('buildPrompt', () => {
+    it('always aggregates full history (stateless, like kimi)', () => {
+      const result = geminiToolStrategy.buildPrompt({
+        systemPrompt: 'Be helpful.',
+        toolPrompt: '## Tools...',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there' },
+          { role: 'user', content: 'Search cats' },
+        ],
+      });
+
+      expect(result.systemPrompt).toBe('');
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].content).toContain('System: Be helpful.');
+      expect(result.messages[0].content).toContain('## Tools...');
+      expect(result.messages[0].content).toContain('User: Hello');
+      expect(result.messages[0].content).toContain('Assistant: Hi there');
+      expect(result.messages[0].content).toContain('User: Search cats');
+    });
+
+    it('ignores conversationId (always aggregates)', () => {
+      const result = geminiToolStrategy.buildPrompt({
+        systemPrompt: 'Be helpful.',
+        toolPrompt: '',
+        messages: [{ role: 'user', content: 'Hello' }],
+        conversationId: 'should-be-ignored',
+      });
+
+      expect(result.systemPrompt).toBe('');
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].content).toContain('System: Be helpful.');
+      expect(result.messages[0].content).toContain('User: Hello');
+    });
+  });
+
+  it('does not have extractConversationId', () => {
+    expect(geminiToolStrategy.extractConversationId).toBeUndefined();
+  });
+
+  it('serializes assistant content with think and tool_call tags', () => {
+    const result = geminiToolStrategy.serializeAssistantContent!([
+      { type: 'thinking', thinking: 'reasoning' },
+      { type: 'text', text: 'I will search.' },
+      { type: 'toolCall', id: 'x1', name: 'web_search', arguments: { query: 'cats' } },
+    ]);
+    expect(result).toContain('<think>');
+    expect(result).toContain('I will search.');
+    expect(result).toContain('<tool_call id="x1" name="web_search">');
   });
 });
 

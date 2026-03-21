@@ -14,7 +14,7 @@ interface SimpleMessage {
 }
 
 interface ContentPart {
-  type: string;
+  type: 'text' | 'thinking' | 'toolCall';
   text?: string;
   thinking?: string;
   id?: string;
@@ -46,11 +46,16 @@ interface WebProviderToolStrategy {
 
 // ── Conversation ID Cache ────────────────────────
 
+const CONVERSATION_ID_CACHE_MAX = 100;
 const conversationIdCache = new Map<string, string>();
 
 const getConversationId = (key: string): string | undefined => conversationIdCache.get(key);
 
 const setConversationId = (key: string, id: string): void => {
+  if (conversationIdCache.size >= CONVERSATION_ID_CACHE_MAX && !conversationIdCache.has(key)) {
+    const oldest = conversationIdCache.keys().next().value;
+    if (oldest !== undefined) conversationIdCache.delete(oldest);
+  }
   conversationIdCache.set(key, id);
 };
 

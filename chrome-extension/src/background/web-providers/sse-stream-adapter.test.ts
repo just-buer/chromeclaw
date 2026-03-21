@@ -103,8 +103,22 @@ describe('getSseStreamAdapter', () => {
     expect(result).toEqual({ feedText: 'hello' });
   });
 
-  // Note: no providers currently use the default adapter (all have dedicated adapters).
-  // If a new provider is added without a dedicated adapter, add a test here.
+  it('returns a Gemini adapter for gemini-web', () => {
+    const adapter = getSseStreamAdapter('gemini-web');
+    const chunk = (text: string) => {
+      const inner = JSON.stringify([
+        null, ['c1', 'r1'], null, null,
+        [['rc_1', [text]]],
+      ]);
+      return [['wrb.fr', null, inner]];
+    };
+    expect(adapter.processEvent({ parsed: chunk('Hello'), delta: null })).toEqual({
+      feedText: 'Hello',
+    });
+    expect(adapter.processEvent({ parsed: chunk('Hello world'), delta: null })).toEqual({
+      feedText: ' world',
+    });
+  });
 
   it('returns independent adapter instances per call', () => {
     const a = getSseStreamAdapter('qwen-web');
