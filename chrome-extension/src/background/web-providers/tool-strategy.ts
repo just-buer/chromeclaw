@@ -59,6 +59,8 @@ const setConversationId = (key: string, id: string): void => {
   conversationIdCache.set(key, id);
 };
 
+const clearConversationId = (key: string): boolean => conversationIdCache.delete(key);
+
 // ── Default Strategy ─────────────────────────────
 // Default strategy — delegates to existing XML tool prompt.
 
@@ -285,6 +287,7 @@ export {
   getToolStrategy,
   getConversationId,
   setConversationId,
+  clearConversationId,
   defaultToolStrategy,
   claudeToolStrategy,
   qwenToolStrategy,

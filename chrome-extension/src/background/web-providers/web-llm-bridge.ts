@@ -19,7 +19,7 @@ import { installRelay } from './content-fetch-relay';
 import { getWebProvider } from './registry';
 import { getSseStreamAdapter } from './sse-stream-adapter';
 import { createSseParser } from './sse-parser';
-import { getToolStrategy, getConversationId, setConversationId } from './tool-strategy';
+import { getToolStrategy, getConversationId, setConversationId, clearConversationId } from './tool-strategy';
 import { createXmlTagParser } from './xml-tag-parser';
 import { createAssistantMessageEventStream } from '../agents';
 import { createLogger } from '../logging/logger-buffer';
@@ -251,15 +251,36 @@ export const requestWebGeneration = (opts: {
             return;
           }
 
-          // Abort early when the provider tried native tool calls that failed
+          // Abort early when the provider attempted native tool calls that were
+          // intercepted (e.g. Qwen's built-in web_search) or that failed
           // (e.g. Qwen's "Tool X does not exists"). Everything generated after
-          // this point is based on the wrong assumption that tools are unavailable.
+          // this point is based on the provider's own results, not ours.
           // Stop processing, let the agent loop execute real tools and retry.
           if (adapter.shouldAbort() && hasToolCalls) {
-            bridgeLog.debug('Aborting stream early — native tool failure detected', {
+            bridgeLog.debug('Aborting stream early — native tool call intercepted', {
               requestId,
               hasToolCalls,
             });
+
+            // Flush any remaining pending native calls as tool_calls
+            // (handles parallel calls where only the first response triggered abort)
+            if (adapter.flushPendingCalls) {
+              const flushed = adapter.flushPendingCalls();
+              if (flushed) {
+                emitParsedEvents(xmlParser.feed(flushed.feedText));
+              }
+            }
+
+            // Clear conversation ID so next turn uses full history aggregation
+            // instead of reusing the contaminated server-side session.
+            if (cacheKey) {
+              clearConversationId(cacheKey);
+              bridgeLog.debug('Cleared conversation ID after native tool interception', {
+                requestId,
+                cacheKey,
+              });
+            }
+
             finishStream('toolUse');
             return;
           }

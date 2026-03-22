@@ -1669,7 +1669,7 @@ describe('createQwenStreamAdapter', () => {
       expect(adapter.shouldAbort()).toBe(true);
     });
 
-    it('returns false when function response has no "does not exist" content', () => {
+    it('returns true when native function_call is intercepted even with empty content (e.g. web_search)', () => {
       // Qwen's own web_search — tool_result in extra, empty content
       adapter.processEvent({
         parsed: makePayload({
@@ -1682,7 +1682,7 @@ describe('createQwenStreamAdapter', () => {
         parsed: makePayload({ role: 'function', content: '', function_id: 'call_aaa' }),
         delta: null,
       });
-      expect(adapter.shouldAbort()).toBe(false);
+      expect(adapter.shouldAbort()).toBe(true);
     });
 
     it('stays true once set (latched)', () => {
@@ -1769,6 +1769,122 @@ describe('createQwenStreamAdapter', () => {
       });
       expect(adapter.flush()).toEqual({ feedText: '</think>' });
       expect(adapter.flush()).toBeNull();
+    });
+  });
+
+  describe('flushPendingCalls — emit remaining native function_calls as XML', () => {
+    it('returns null when no pending calls', () => {
+      expect(adapter.flushPendingCalls!()).toBeNull();
+    });
+
+    it('flushes a single pending call from the map', () => {
+      adapter.processEvent({
+        parsed: makePayload({
+          function_call: { name: 'web_search', arguments: '{"q":"test"}' },
+          function_id: 'call_a',
+        }),
+        delta: null,
+      });
+      const result = adapter.flushPendingCalls!();
+      expect(result).not.toBeNull();
+      expect(result!.feedText).toContain('name="web_search"');
+      expect(result!.feedText).toContain('{"q":"test"}');
+      expect(result!.feedText).toMatch(/<tool_call id="[^"]+" name="web_search">/);
+    });
+
+    it('flushes multiple pending calls from map', () => {
+      adapter.processEvent({
+        parsed: makePayload({
+          function_call: { name: 'web_search', arguments: '{"q":"first"}' },
+          function_id: 'call_a',
+        }),
+        delta: null,
+      });
+      adapter.processEvent({
+        parsed: makePayload({
+          function_call: { name: 'web_search', arguments: '{"q":"second"}' },
+          function_id: 'call_b',
+        }),
+        delta: null,
+      });
+      const result = adapter.flushPendingCalls!();
+      expect(result!.feedText).toContain('"q":"first"');
+      expect(result!.feedText).toContain('"q":"second"');
+    });
+
+    it('flushes queued default calls plus in-progress pending', () => {
+      // Two sequential no-fn_id calls: first queued, second pending
+      adapter.processEvent({
+        parsed: makePayload({ function_call: { name: 'read', arguments: '' } }),
+        delta: null,
+      });
+      adapter.processEvent({
+        parsed: makePayload({ function_call: { name: 'read', arguments: '{"path":"A"}' } }),
+        delta: null,
+      });
+      // Arguments reset to empty → first call queued, second starts
+      adapter.processEvent({
+        parsed: makePayload({ function_call: { name: 'read', arguments: '' } }),
+        delta: null,
+      });
+      adapter.processEvent({
+        parsed: makePayload({ function_call: { name: 'read', arguments: '{"path":"B"}' } }),
+        delta: null,
+      });
+
+      const result = adapter.flushPendingCalls!();
+      expect(result!.feedText).toContain('"path":"A"');
+      expect(result!.feedText).toContain('"path":"B"');
+      // Queue (A) should be flushed before pending (B)
+      const indexA = result!.feedText.indexOf('"path":"A"');
+      const indexB = result!.feedText.indexOf('"path":"B"');
+      expect(indexA).toBeLessThan(indexB);
+    });
+
+    it('closes open think block before flushing', () => {
+      adapter.processEvent({
+        parsed: makePayload({ phase: 'think', content: 'thinking' }),
+        delta: 'thinking',
+      });
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'think',
+          function_call: { name: 'web_search', arguments: '{"q":"test"}' },
+          function_id: 'call_a',
+        }),
+        delta: null,
+      });
+      const result = adapter.flushPendingCalls!();
+      expect(result!.feedText).toMatch(/^<\/think>/);
+      expect(result!.feedText).toContain('name="web_search"');
+    });
+
+    it('is idempotent — second call returns null', () => {
+      adapter.processEvent({
+        parsed: makePayload({
+          function_call: { name: 'web_search', arguments: '{"q":"test"}' },
+        }),
+        delta: null,
+      });
+      adapter.flushPendingCalls!();
+      expect(adapter.flushPendingCalls!()).toBeNull();
+    });
+
+    it('does not re-emit calls already converted via processEvent', () => {
+      adapter.processEvent({
+        parsed: makePayload({
+          function_call: { name: 'web_search', arguments: '{"q":"done"}' },
+          function_id: 'call_a',
+        }),
+        delta: null,
+      });
+      // The function response converts the pending call to XML via processEvent
+      adapter.processEvent({
+        parsed: makePayload({ role: 'function', content: '', function_id: 'call_a' }),
+        delta: null,
+      });
+      // Nothing left to flush
+      expect(adapter.flushPendingCalls!()).toBeNull();
     });
   });
 });

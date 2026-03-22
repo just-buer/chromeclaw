@@ -6,6 +6,7 @@ import {
   getToolStrategy,
   getConversationId,
   setConversationId,
+  clearConversationId,
   qwenToolStrategy,
   defaultToolStrategy,
   claudeToolStrategy,
@@ -675,5 +676,16 @@ describe('conversation ID cache', () => {
     setConversationId('overwrite-key', 'first');
     setConversationId('overwrite-key', 'second');
     expect(getConversationId('overwrite-key')).toBe('second');
+  });
+
+  it('clears a cached conversation ID', () => {
+    setConversationId('clear-key', 'conv-456');
+    expect(getConversationId('clear-key')).toBe('conv-456');
+    expect(clearConversationId('clear-key')).toBe(true);
+    expect(getConversationId('clear-key')).toBeUndefined();
+  });
+
+  it('clearConversationId returns false for unknown key', () => {
+    expect(clearConversationId('nonexistent-clear-key')).toBe(false);
   });
 });

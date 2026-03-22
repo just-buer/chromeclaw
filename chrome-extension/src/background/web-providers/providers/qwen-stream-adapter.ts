@@ -48,6 +48,8 @@ const createQwenStreamAdapter = (): SseStreamAdapter => {
   let currentPhase: string | undefined;
   /** Set to true when a native tool call gets "Tool X does not exists" from Qwen's server. */
   let nativeToolFailed = false;
+  /** Set to true when ANY native function_call is intercepted and converted to XML tool_call. */
+  let nativeCallIntercepted = false;
   /**
    * Track pending native function_calls by function_id.
    * Qwen can send multiple parallel function_calls (e.g. two web_search calls
@@ -132,6 +134,7 @@ const createQwenStreamAdapter = (): SseStreamAdapter => {
         }
 
         if (pending) {
+          nativeCallIntercepted = true;
           // Detect native tool failure: Qwen says "Tool X does not exists."
           // This means Qwen's server doesn't have this tool — our bridge will
           // handle it. Everything Qwen generates after this point is based on
@@ -186,7 +189,36 @@ const createQwenStreamAdapter = (): SseStreamAdapter => {
     },
 
     shouldAbort() {
-      return nativeToolFailed;
+      return nativeToolFailed || nativeCallIntercepted;
+    },
+
+    flushPendingCalls() {
+      const parts: string[] = [];
+
+      // Flush completed default queue first (FIFO)
+      while (completedDefaultQueue.length > 0) {
+        const call = completedDefaultQueue.shift()!;
+        const toolId = crypto.randomUUID().slice(0, 8);
+        const safeName = escapeXml(call.name);
+        parts.push(`<tool_call id="${toolId}" name="${safeName}">${call.arguments}</tool_call>`);
+      }
+
+      // Flush remaining pending calls from the map
+      for (const [, call] of pendingFunctionCalls) {
+        const toolId = crypto.randomUUID().slice(0, 8);
+        const safeName = escapeXml(call.name);
+        parts.push(`<tool_call id="${toolId}" name="${safeName}">${call.arguments}</tool_call>`);
+      }
+      pendingFunctionCalls.clear();
+
+      if (parts.length === 0) return null;
+
+      let prefix = '';
+      if (currentPhase === 'think') {
+        prefix = '</think>';
+        currentPhase = 'answer';
+      }
+      return { feedText: prefix + parts.join('') };
     },
   };
 };

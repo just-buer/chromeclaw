@@ -19,13 +19,16 @@ interface SseStreamAdapter {
   /**
    * Whether the bridge should abort the SSE stream early.
    *
-   * Returns true when the provider attempted native tool calls that failed
-   * (e.g. Qwen's "Tool X does not exists" responses). Everything Qwen
-   * generates after that point is based on the wrong assumption that tools
-   * are unavailable, so the bridge should stop processing, let the agent
-   * loop execute the real tools, and retry with actual results.
+   * Returns true when the provider attempted native tool calls that were
+   * intercepted by the adapter (e.g. Qwen's built-in web_search) or that
+   * failed (e.g. Qwen's "Tool X does not exists" responses). Everything
+   * the provider generates after native tool calls is based on its own
+   * results, not ours, so the bridge should stop processing and let the
+   * agent loop execute the real tools with actual results.
    */
   shouldAbort(): boolean;
+  /** Flush all pending native function calls as XML tool_calls. Used before aborting. */
+  flushPendingCalls?(): { feedText: string } | null;
 }
 
 const createDefaultAdapter = (): SseStreamAdapter => ({
