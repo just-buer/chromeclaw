@@ -6,6 +6,7 @@
  */
 
 import type { BrowserArgs, ScreenshotResult } from './browser';
+import { sanitizeImage } from './image-sanitization';
 
 // The `browser` global is provided by webextension-polyfill (imported in index.ts)
 // or natively by Firefox. We declare it loosely here since @types/webextension-polyfill
@@ -324,6 +325,24 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
 
   // Strip data URL prefix to get base64
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+
+  // Resize, compress, and get real dimensions (matches Chrome behavior)
+  let sanitized;
+  try {
+    sanitized = await sanitizeImage(base64, 'image/png');
+  } catch {
+    // Fallback: return raw PNG if sanitization fails (e.g. OffscreenCanvas unavailable)
+  }
+
+  if (sanitized) {
+    return {
+      __type: 'screenshot',
+      base64: sanitized.base64,
+      mimeType: sanitized.mimeType,
+      width: sanitized.width,
+      height: sanitized.height,
+    };
+  }
 
   return {
     __type: 'screenshot',
