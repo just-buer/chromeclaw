@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. 🦞"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw – KI-Assistent im Browser 🦞"
+  },
   "displayErrorInfo": {
     "message": "Fehler aufgetreten"
   },
@@ -69,6 +73,24 @@
   },
   "firstRun_stepTools": {
     "message": "Tools"
+  },
+  "firstRun_stepPermissions": {
+    "message": "Berechtigungen"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Host-Berechtigungen"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox erfordert eine explizite Berechtigung, damit Tools mit Webseiten interagieren können. Gewähre Zugriff, damit der KI-Assistent Seiteninhalte lesen und darauf reagieren kann."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Host-Berechtigungen erteilt — Tools können auf Webseiten zugreifen."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Berechtigung erteilen"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "Berechtigung wurde verweigert. Tools, die mit Webseiten interagieren, funktionieren möglicherweise nicht. Du kannst dies später in den Berechtigungseinstellungen der Erweiterung erteilen."
   },
   "firstRun_step2Title": {
     "message": "Connect Channels"

@@ -76,16 +76,18 @@ export const createStorage = <D = string>(
   ) {
     checkStoragePermission(storageEnum);
 
-    chrome?.storage[storageEnum]
-      .setAccessLevel({
-        accessLevel: SessionAccessLevelEnum.ExtensionPagesAndContentScripts,
-      })
-      .catch(error => {
-        console.error(error);
-        console.error(
-          'Please call .setAccessLevel() into different context, like a background script.',
-        );
-      });
+    if (typeof chrome?.storage[storageEnum]?.setAccessLevel === 'function') {
+      chrome.storage[storageEnum]
+        .setAccessLevel({
+          accessLevel: SessionAccessLevelEnum.ExtensionPagesAndContentScripts,
+        })
+        .catch(error => {
+          console.error(error);
+          console.error(
+            'Please call .setAccessLevel() into different context, like a background script.',
+          );
+        });
+    }
     globalSessionAccessLevelFlag = true;
   }
 

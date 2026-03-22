@@ -614,6 +614,27 @@ describe('hallucinated tool_response suppression', () => {
     expect(text).toBe('BeforeAfter');
   });
 
+  it('emits tool_call + trailing text for tool_call then hallucinated tool_response then summary', () => {
+    const parser = createXmlTagParser();
+    const events = parser.feed(
+      '<tool_call id="a1" name="web_fetch">{"url":"https://news.ycombinator.com"}</tool_call>\n' +
+        '<tool_response id="a1" name="web_fetch">\nfabricated response data\n</tool_response>\n' +
+        'Based on the results, here is my summary.',
+    );
+    const types = events.map(e => e.type);
+    // Tool call is parsed correctly
+    expect(types).toContain('tool_call');
+    const textContent = events
+      .filter(e => e.type === 'text')
+      .map(e => (e as { type: 'text'; text: string }).text)
+      .join('');
+    // tool_response content is suppressed by the parser
+    expect(textContent).not.toContain('fabricated response data');
+    // Trailing summary text IS emitted as text by the parser
+    // (the bridge layer is responsible for suppressing it via hasToolCalls)
+    expect(textContent).toContain('Based on the results');
+  });
+
   it('discards unclosed tool_response on flush', () => {
     const parser = createXmlTagParser();
     const e1 = parser.feed('Text<tool_response id="t1" name="x">no closing tag');

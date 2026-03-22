@@ -2,6 +2,7 @@ import { getChannelConfig, getChannelConfigs, updateChannelConfig } from './conf
 import { handleChannelUpdates } from './message-bridge';
 import { createPassiveAlarm, clearPassiveAlarm } from './poller';
 import { createLogger } from '../logging/logger-buffer';
+import { IS_FIREFOX } from '@extension/env';
 
 const offscreenLog = createLogger('offscreen-mgr');
 
@@ -9,17 +10,110 @@ const OFFSCREEN_URL = 'offscreen-channels/index.html';
 const WATCHDOG_ALARM = 'channel-watchdog';
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-/** Ensure the shared offscreen document exists */
-const ensureOffscreenDocument = async (): Promise<void> => {
-  const exists = await chrome.offscreen.hasDocument();
-  if (exists) return;
+// ---------------------------------------------------------------------------
+// Offscreen Backend interface
+// ---------------------------------------------------------------------------
 
-  await chrome.offscreen.createDocument({
-    url: chrome.runtime.getURL(OFFSCREEN_URL),
-    reasons: [chrome.offscreen.Reason.WORKERS],
-    justification: 'Long-poll connection for channel messaging (Telegram, etc.)',
-  });
-  offscreenLog.info('Offscreen document created');
+interface OffscreenBackend {
+  ensure(): Promise<void>;
+  isAlive(): Promise<boolean>;
+  close(): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Chrome backend — uses chrome.offscreen API
+// ---------------------------------------------------------------------------
+
+const chromeBackend: OffscreenBackend = {
+  async ensure() {
+    const exists = await chrome.offscreen.hasDocument();
+    if (exists) return;
+
+    await chrome.offscreen.createDocument({
+      url: chrome.runtime.getURL(OFFSCREEN_URL),
+      reasons: [chrome.offscreen.Reason.WORKERS],
+      justification: 'Long-poll connection for channel messaging (Telegram, etc.)',
+    });
+    offscreenLog.info('Offscreen document created');
+  },
+  async isAlive() {
+    return chrome.offscreen.hasDocument();
+  },
+  async close() {
+    const exists = await chrome.offscreen.hasDocument();
+    if (exists) {
+      await chrome.offscreen.closeDocument();
+      offscreenLog.info('Offscreen document closed');
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Firefox backend — uses a hidden popup window to host the worker page
+// (Firefox has no chrome.offscreen API but background pages are persistent)
+// ---------------------------------------------------------------------------
+
+let firefoxWindowId: number | null = null;
+
+const firefoxBackend: OffscreenBackend = {
+  async ensure() {
+    // Check if the hidden window is still alive
+    if (firefoxWindowId != null) {
+      try {
+        await chrome.windows.get(firefoxWindowId);
+        return; // still alive
+      } catch {
+        firefoxWindowId = null; // window was closed
+      }
+    }
+
+    const url = chrome.runtime.getURL(OFFSCREEN_URL);
+    const win = await chrome.windows.create({
+      url,
+      type: 'popup',
+      state: 'minimized',
+      width: 1,
+      height: 1,
+    });
+    firefoxWindowId = win.id ?? null;
+    offscreenLog.info('Firefox: hidden worker window created', { windowId: firefoxWindowId });
+  },
+  async isAlive() {
+    if (firefoxWindowId == null) return false;
+    try {
+      await chrome.windows.get(firefoxWindowId);
+      return true;
+    } catch {
+      firefoxWindowId = null;
+      return false;
+    }
+  },
+  async close() {
+    if (firefoxWindowId != null) {
+      try {
+        await chrome.windows.remove(firefoxWindowId);
+        offscreenLog.info('Firefox: hidden worker window closed', { windowId: firefoxWindowId });
+      } catch {
+        // window already gone
+      }
+      firefoxWindowId = null;
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Select backend once at module load
+// ---------------------------------------------------------------------------
+
+const backend: OffscreenBackend = IS_FIREFOX ? firefoxBackend : chromeBackend;
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/** Ensure the shared offscreen document / worker router exists */
+const ensureOffscreenDocument = async (): Promise<void> => {
+  await backend.ensure();
 };
 
 /** Close the offscreen document if no channels need it */
@@ -28,12 +122,7 @@ const maybeCloseOffscreenDocument = async (): Promise<void> => {
   const hasActive = configs.some(c => c.status === 'active');
   if (hasActive) return;
 
-  const exists = await chrome.offscreen.hasDocument();
-  if (exists) {
-    await chrome.offscreen.closeDocument();
-    offscreenLog.info('Offscreen document closed');
-  }
-
+  await backend.close();
   await chrome.alarms.clear(WATCHDOG_ALARM);
 };
 
@@ -68,7 +157,10 @@ const sendStartWorker = async (
     // Wait before retry — offscreen document script may still be loading
     await new Promise(r => setTimeout(r, attempt * 200));
   }
-  offscreenLog.warn('CHANNEL_START_WORKER not acknowledged after retries', { channelId, maxAttempts });
+  offscreenLog.warn('CHANNEL_START_WORKER not acknowledged after retries', {
+    channelId,
+    maxAttempts,
+  });
 };
 
 /** Switch a channel to active mode (offscreen long-polling) */
@@ -98,14 +190,17 @@ const switchToActiveMode = async (channelId: string): Promise<void> => {
         sessionRulesCount: rules.length,
         dynamicRulesCount: dynamicRules.length,
       });
-      const testResult = await chrome.declarativeNetRequest.testMatchOutcome({
-        url: 'wss://web.whatsapp.com/ws/chat',
-        type: 'websocket' as chrome.declarativeNetRequest.ResourceType,
-        initiator: `chrome-extension://${chrome.runtime.id}`,
-      });
-      offscreenLog.info('declarativeNetRequest testMatchOutcome for WS', {
-        matchedRules: testResult.matchedRules,
-      });
+      // Guard testMatchOutcome — not available on Firefox
+      if (typeof chrome.declarativeNetRequest.testMatchOutcome === 'function') {
+        const testResult = await chrome.declarativeNetRequest.testMatchOutcome({
+          url: 'wss://web.whatsapp.com/ws/chat',
+          type: 'websocket' as chrome.declarativeNetRequest.ResourceType,
+          initiator: `chrome-extension://${chrome.runtime.id}`,
+        });
+        offscreenLog.info('declarativeNetRequest testMatchOutcome for WS', {
+          matchedRules: testResult.matchedRules,
+        });
+      }
     } catch (err) {
       offscreenLog.warn('declarativeNetRequest diagnostic failed', { error: String(err) });
     }
@@ -179,8 +274,8 @@ const handleWatchdogAlarm = async (): Promise<void> => {
   const hasActiveChannels = freshConfigs.some(c => c.status === 'active');
 
   if (hasActiveChannels) {
-    const exists = await chrome.offscreen.hasDocument();
-    if (!exists) {
+    const alive = await backend.isAlive();
+    if (!alive) {
       offscreenLog.warn('Offscreen document missing during active mode, re-creating');
       for (const config of freshConfigs) {
         if (config.status === 'active') {
@@ -257,7 +352,11 @@ const handleOffscreenMessage = async (message: Record<string, unknown>): Promise
     // WhatsApp-specific messages: forward to UI (Options page, side panel)
     case 'WA_QR_CODE':
     case 'WA_CONNECTION_STATUS': {
-      offscreenLog.info('Forwarding to UI pages', { type, status: message.status, statusCode: message.statusCode });
+      offscreenLog.info('Forwarding to UI pages', {
+        type,
+        status: message.status,
+        statusCode: message.statusCode,
+      });
       try {
         chrome.runtime.sendMessage(message).catch(err => {
           offscreenLog.debug('Broadcast had no listeners', { type, error: String(err) });

@@ -129,6 +129,10 @@ export const requestWebGeneration = (opts: {
       }
       switch (event.type) {
         case 'text':
+          // Suppress text emitted after tool calls — likely hallucinated content
+          // based on fake <tool_response> blocks the model generated inline.
+          // The agent loop will re-prompt with real tool results on the next turn.
+          if (hasToolCalls) break;
           fullText += event.text;
           textContent.text = fullText;
           stream.push({ type: 'text_delta', contentIndex: 0, delta: event.text, partial });

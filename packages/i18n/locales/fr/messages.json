@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw – Votre assistant IA personnel dans votre navigateur. 🦞"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw – Assistant IA dans le Navigateur 🦞"
+  },
   "displayErrorInfo": {
     "message": "Erreur survenue"
   },
@@ -69,6 +73,24 @@
   },
   "firstRun_stepTools": {
     "message": "Tools"
+  },
+  "firstRun_stepPermissions": {
+    "message": "Permissions"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Permissions d'hôte"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox nécessite une autorisation explicite pour que les outils interagissent avec les pages web. Accordez l'accès pour que l'assistant IA puisse lire et agir sur le contenu des pages."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Permissions d'hôte accordées — les outils peuvent accéder aux pages web."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Accorder la permission"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "La permission a été refusée. Les outils qui interagissent avec les pages web peuvent ne pas fonctionner. Vous pouvez accorder cette permission plus tard dans les paramètres de permissions de l'extension."
   },
   "firstRun_step2Title": {
     "message": "Connect Channels"

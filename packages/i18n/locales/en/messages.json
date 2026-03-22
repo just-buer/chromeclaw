@@ -7,6 +7,10 @@
     "description": "Extension name",
     "message": "ChromeClaw - Your own personal AI assistant in your browser. 🦞"
   },
+  "extensionShortName": {
+    "description": "Short extension name for Firefox (max 50 chars)",
+    "message": "ChromeClaw - Personal AI Assistant in Browser 🦞"
+  },
   "displayErrorInfo": {
     "message": "Error occur"
   },
@@ -69,6 +73,24 @@
   },
   "firstRun_stepTools": {
     "message": "Tools"
+  },
+  "firstRun_stepPermissions": {
+    "message": "Permissions"
+  },
+  "firstRun_permissionsTitle": {
+    "message": "Host Permissions"
+  },
+  "firstRun_permissionsDescription": {
+    "message": "Firefox requires explicit permission to let tools interact with web pages. Grant access so the AI assistant can read and act on page content."
+  },
+  "firstRun_permissionsGranted": {
+    "message": "Host permissions granted — tools can access web pages."
+  },
+  "firstRun_permissionsGrant": {
+    "message": "Grant Permission"
+  },
+  "firstRun_permissionsDenied": {
+    "message": "Permission was denied. Tools that interact with web pages may not work. You can grant this later in the extension's permissions settings."
   },
   "firstRun_step2Title": {
     "message": "Connect Channels"

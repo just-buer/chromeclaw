@@ -572,6 +572,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@extension/env':
+        specifier: workspace:*
+        version: link:../env
       '@extension/i18n':
         specifier: workspace:*
         version: link:../i18n

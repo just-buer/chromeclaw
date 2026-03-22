@@ -1,5 +1,6 @@
-import { listChats, deleteChat, searchChats, lastActiveSessionStorage } from '@extension/storage';
 import { useT } from '@extension/i18n';
+import { openSidePanel } from '@extension/shared';
+import { listChats, deleteChat, searchChats, lastActiveSessionStorage } from '@extension/storage';
 import {
   Card,
   CardContent,
@@ -49,7 +50,17 @@ const formatDate = (ts: number): string => {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-const toRows = (chats: { id: string; title: string; source?: string; agentId?: string; model?: string; totalTokens?: number; updatedAt: number }[]): SessionRow[] =>
+const toRows = (
+  chats: {
+    id: string;
+    title: string;
+    source?: string;
+    agentId?: string;
+    model?: string;
+    totalTokens?: number;
+    updatedAt: number;
+  }[],
+): SessionRow[] =>
   chats
     .map(c => ({
       id: c.id,
@@ -103,14 +114,17 @@ const SessionManager = ({ onOpenSession }: { onOpenSession?: (chatId: string) =>
     await lastActiveSessionStorage.set(chatId);
   }, []);
 
-  const handleDoubleClick = useCallback(async (chatId: string) => {
-    if (onOpenSession) {
-      onOpenSession(chatId);
-    } else {
-      await lastActiveSessionStorage.set(chatId);
-      await chrome.sidePanel.open({});
-    }
-  }, [onOpenSession]);
+  const handleDoubleClick = useCallback(
+    async (chatId: string) => {
+      if (onOpenSession) {
+        onOpenSession(chatId);
+      } else {
+        await lastActiveSessionStorage.set(chatId);
+        await openSidePanel();
+      }
+    },
+    [onOpenSession],
+  );
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -150,7 +164,7 @@ const SessionManager = ({ onOpenSession }: { onOpenSession?: (chatId: string) =>
         </CardHeader>
         <CardContent>
           <div className="relative mb-3">
-            <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+            <SearchIcon className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
             <Input
               placeholder={t('sessionMgr_searchPlaceholder')}
               value={searchQuery}
@@ -168,7 +182,11 @@ const SessionManager = ({ onOpenSession }: { onOpenSession?: (chatId: string) =>
                 <div
                   className={`hover:bg-muted/50 flex cursor-pointer select-none items-center gap-3 px-3 py-2 transition-colors${s.id === activeSessionId ? ' bg-muted' : ''}`}
                   key={s.id}
-                  title={onOpenSession ? t('sessionMgr_clickToSelect') : t('sessionMgr_clickToSelectSidePanel')}
+                  title={
+                    onOpenSession
+                      ? t('sessionMgr_clickToSelect')
+                      : t('sessionMgr_clickToSelectSidePanel')
+                  }
                   onClick={() => handleClick(s.id)}
                   onDoubleClick={() => handleDoubleClick(s.id)}>
                   <div className="min-w-0 flex-1">
@@ -212,9 +230,7 @@ const SessionManager = ({ onOpenSession }: { onOpenSession?: (chatId: string) =>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('session_deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('session_deleteDescription')}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('session_deleteDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common_cancel')}</AlertDialogCancel>

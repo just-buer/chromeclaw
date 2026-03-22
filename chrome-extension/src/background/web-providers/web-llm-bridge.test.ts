@@ -291,6 +291,59 @@ describe('requestWebGeneration', () => {
     expect(events.length).toBe(eventsBeforeExtra);
   });
 
+  it('suppresses text after tool_call (hallucinated tool_response summary)', async () => {
+    const stream = requestWebGeneration(defaultOpts);
+
+    await vi.waitFor(() => {
+      const events = (stream as any).events as Array<{ type: string }>;
+      expect(events.some(e => e.type === 'start')).toBe(true);
+    });
+
+    // Text before tool_call — should be emitted
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"Let me check that for you."}}]}\n\n',
+    });
+
+    // Tool call
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"<tool_call>{\\"name\\":\\"web_fetch\\",\\"arguments\\":{\\"url\\":\\"https://news.ycombinator.com\\"}}</tool_call>"}}]}\n\n',
+    });
+
+    // Hallucinated summary text after tool_call — should be suppressed
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"Here are the top stories from Hacker News: 1. Fake story..."}}]}\n\n',
+    });
+
+    // Finish stream
+    fireMessage({ type: 'WEB_LLM_DONE', requestId: 'web-test-uuid' });
+
+    const events = (stream as any).events as Array<{ type: string; delta?: string; reason?: string }>;
+
+    // Text before tool_call is preserved
+    const textDeltas = events.filter(e => e.type === 'text_delta').map(e => e.delta);
+    expect(textDeltas).toContain('Let me check that for you.');
+
+    // Hallucinated summary is NOT present
+    const allText = textDeltas.join('');
+    expect(allText).not.toContain('Fake story');
+    expect(allText).not.toContain('Here are the top stories');
+
+    // Tool call is still emitted
+    expect(events.some(e => e.type === 'toolcall_start')).toBe(true);
+    expect(events.some(e => e.type === 'toolcall_end')).toBe(true);
+
+    // Done with toolUse reason
+    const doneEvent = events.find(e => e.type === 'done');
+    expect(doneEvent).toBeDefined();
+    expect(doneEvent!.reason).toBe('toolUse');
+  });
+
   it('emits error when provider is not found', async () => {
     const stream = requestWebGeneration({
       ...defaultOpts,

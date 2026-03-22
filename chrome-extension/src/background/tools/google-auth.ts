@@ -9,6 +9,7 @@
  */
 
 import { createLogger } from '../logging/logger-buffer';
+import { IS_FIREFOX } from '@extension/env';
 import { toolConfigStorage } from '@extension/storage';
 
 const gLog = createLogger('tool');
@@ -41,9 +42,12 @@ const getGoogleClientId = async (): Promise<string | undefined> => {
     clientIdLoaded = true;
     // Subscribe to future changes
     toolConfigStorage.subscribe(() => {
-      toolConfigStorage.get().then(c => {
-        cachedGoogleClientId = c.googleClientId;
-      }).catch(() => {});
+      toolConfigStorage
+        .get()
+        .then(c => {
+          cachedGoogleClientId = c.googleClientId;
+        })
+        .catch(() => {});
     });
   }
   return cachedGoogleClientId;
@@ -119,6 +123,15 @@ const getTokenViaWebAuthFlow = async (
  */
 const getGoogleToken = async (scopes: string[], interactive = true): Promise<string> => {
   const customClientId = await getGoogleClientId();
+
+  // Firefox does not support chrome.identity.getAuthToken — require custom client ID
+  if (IS_FIREFOX && !customClientId) {
+    throw new Error(
+      'Google tools require a Google Client ID on Firefox. ' +
+        'Set a custom client ID in Settings → Tools → Google Client ID.',
+    );
+  }
+
   const authPath = customClientId ? 'webAuthFlow' : 'getAuthToken';
   gLog.trace('[google] getToken', { path: authPath, scopes, interactive });
 
@@ -147,8 +160,10 @@ const removeCachedToken = async (token: string): Promise<void> => {
       return;
     }
   }
-  // Remove from Chrome's built-in cache
-  await chrome.identity.removeCachedAuthToken({ token });
+  // Remove from Chrome's built-in cache (not available on Firefox)
+  if (!IS_FIREFOX && typeof chrome.identity?.removeCachedAuthToken === 'function') {
+    await chrome.identity.removeCachedAuthToken({ token });
+  }
 };
 
 /** Revoke Google access by clearing all cached tokens. */
@@ -163,19 +178,21 @@ const revokeGoogleAccess = async (): Promise<void> => {
   }
   webAuthTokenCache.clear();
 
-  // Clear Chrome's built-in cache
-  try {
-    const result = await chrome.identity.getAuthToken({ interactive: false });
-    const token = result.token;
-    if (!token) return;
-    await chrome.identity.removeCachedAuthToken({ token });
-    await fetch('https://accounts.google.com/o/oauth2/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `token=${token}`,
-    }).catch(() => {});
-  } catch {
-    // No token cached
+  // Clear Chrome's built-in cache (not available on Firefox)
+  if (!IS_FIREFOX) {
+    try {
+      const result = await chrome.identity.getAuthToken({ interactive: false });
+      const token = result.token;
+      if (!token) return;
+      await chrome.identity.removeCachedAuthToken({ token });
+      await fetch('https://accounts.google.com/o/oauth2/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `token=${token}`,
+      }).catch(() => {});
+    } catch {
+      // No token cached
+    }
   }
 };
 
@@ -208,7 +225,11 @@ const googleFetch = async <T>(url: string, scopes: string[], init?: RequestInit)
     if (!response.ok) {
       const body = await response.text().catch(() => '');
       const msg = `Google API error ${response.status}: ${response.statusText} — ${body.slice(0, 200)}`;
-      gLog.error('[google] request failed', { url, status: response.status, body: body.slice(0, 300) });
+      gLog.error('[google] request failed', {
+        url,
+        status: response.status,
+        body: body.slice(0, 300),
+      });
       throw new Error(msg);
     }
 
@@ -252,7 +273,11 @@ const googleFetchRaw = async (
     if (!response.ok) {
       const body = await response.text().catch(() => '');
       const msg = `Google API error ${response.status}: ${response.statusText} — ${body.slice(0, 200)}`;
-      gLog.error('[google] request failed', { url, status: response.status, body: body.slice(0, 300) });
+      gLog.error('[google] request failed', {
+        url,
+        status: response.status,
+        body: body.slice(0, 300),
+      });
       throw new Error(msg);
     }
 

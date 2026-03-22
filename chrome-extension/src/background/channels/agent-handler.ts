@@ -14,14 +14,16 @@ import {
 } from './telegram/bot-api';
 import { sendAudioViaOffscreen } from './whatsapp/adapter';
 import { dbModelToChatModel, runAgent } from '../agents/agent-setup';
+import { chatMessagesToPiMessages, convertToLlm, makeConvertToLlm } from '../agents/message-adapter';
 import { sanitizeHistory } from '../context/history-sanitization';
+import { createTransformContext } from '../context/transform';
 import { createLogger } from '../logging/logger-buffer';
 import { resolveTranscription } from '../media-understanding';
-import { chatMessagesToPiMessages, makeConvertToLlm } from '../agents/message-adapter';
-import { createTransformContext } from '../context/transform';
-import { maybeApplyTtsBatchedStream } from '../tts';
 import { getToolConfig, getImplementedToolNames } from '../tools';
+import { maybeApplyTtsBatchedStream } from '../tts';
+import { createKeepAliveManager } from '../utils/keep-alive';
 import { buildSystemPrompt, resolveToolPromptHints, resolveToolListings } from '@extension/shared';
+import { IS_FIREFOX } from '@extension/env';
 import {
   createChat,
   addMessage,
@@ -43,26 +45,20 @@ import type { AssistantMessage } from '../agents';
 import type { ChatMessage, ChatModel } from '@extension/shared';
 import type { DbChat } from '@extension/storage';
 
+// ── Keep-alive: prevent SW termination during channel LLM streams ──
+
 const channelLog = createLogger('channel');
 
-// ── Keep-alive: prevent SW termination during channel LLM streams ──
-const CHANNEL_KEEP_ALIVE = 'channel-keep-alive';
-let activeChannelStreams = 0;
+const channelKeepAlive = createKeepAliveManager('channel-keep-alive');
 // Clear any orphaned alarm from a previous SW crash
-chrome.alarms.clear(CHANNEL_KEEP_ALIVE);
+channelKeepAlive.clearOrphan();
 
 const acquireChannelKeepAlive = (): void => {
-  activeChannelStreams++;
-  if (activeChannelStreams === 1) {
-    chrome.alarms.create(CHANNEL_KEEP_ALIVE, { periodInMinutes: 0.4 });
-  }
+  channelKeepAlive.acquire();
 };
 
 const releaseChannelKeepAlive = (): void => {
-  activeChannelStreams = Math.max(0, activeChannelStreams - 1);
-  if (activeChannelStreams === 0) {
-    chrome.alarms.clear(CHANNEL_KEEP_ALIVE);
-  }
+  channelKeepAlive.release();
 };
 
 const TYPING_INTERVAL_MS = 4000;
@@ -298,8 +294,16 @@ const handleChannelMessageInner = async (
         const channelExtraContext = `You are responding via ${adapter.label}. Keep responses concise and well-formatted for mobile reading. Avoid very long responses unless the user explicitly asks for detail.`;
         const { text: systemPrompt } = buildSystemPrompt({
           mode: 'full',
-          tools: resolveToolListings(toolConfig.enabledTools, mainAgent?.customTools, availableTools),
-          toolPromptHints: resolveToolPromptHints(toolConfig.enabledTools, mainAgent?.customTools, availableTools),
+          tools: resolveToolListings(
+            toolConfig.enabledTools,
+            mainAgent?.customTools,
+            availableTools,
+          ),
+          toolPromptHints: resolveToolPromptHints(
+            toolConfig.enabledTools,
+            mainAgent?.customTools,
+            availableTools,
+          ),
           hasTts: ttsEnabled,
           workspaceFiles: workspaceFiles.map(f => ({
             name: f.name,
@@ -314,6 +318,7 @@ const handleChannelMessageInner = async (
           runtimeMeta: {
             modelName: model.name,
             currentDate: new Date().toISOString().split('T')[0],
+            browser: IS_FIREFOX ? 'firefox' : 'chrome',
           },
           extraContext: channelExtraContext,
         });

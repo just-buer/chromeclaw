@@ -1,6 +1,7 @@
 import { cdpSend, cdpAttach } from './cdp';
 import { getActiveAgentId, getWorkspaceFile } from './tool-utils';
 import { getAgent, updateAgent } from '@extension/storage';
+import { IS_FIREFOX } from '@extension/env';
 import { Type } from '@sinclair/typebox';
 import type { CustomToolDef } from '@extension/storage';
 import type { Static } from '@sinclair/typebox';
@@ -274,6 +275,11 @@ const executeCode = async (
   targetTabId?: number,
   exportAs?: string,
 ): Promise<string> => {
+  if (IS_FIREFOX) {
+    const { executeCodeFirefox } = await import('./execute-js-firefox');
+    return executeCodeFirefox(code, args, timeout, targetTabId, exportAs);
+  }
+
   // 1. Determine which tab to run in
   let tabId: number;
   if (targetTabId != null) {
