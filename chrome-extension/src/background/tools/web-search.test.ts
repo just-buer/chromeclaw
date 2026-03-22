@@ -37,7 +37,7 @@ Object.defineProperty(globalThis, 'chrome', {
       ),
       remove: mockTabsRemove,
       get: mockTabsGet,
-      onRemoved: { addListener: vi.fn() },
+      onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
       onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
     },
     windows: { update: vi.fn() },
@@ -84,13 +84,15 @@ Object.defineProperty(globalThis, 'chrome', {
   configurable: true,
 });
 
-// Mock executeBrowser so runBrowserSearch tests don't hit real Chrome APIs.
-// Must be called before importing the module under test.
-const mockExecuteBrowser = vi.fn<(args: Record<string, unknown>) => Promise<string>>();
-vi.mock('./browser', () => ({
-  executeBrowser: (...args: unknown[]) => mockExecuteBrowser(args[0] as Record<string, unknown>),
-  browserSchema: {},
-}));
+// Mock chrome.scripting.executeScript for scriptEvaluate in runBrowserSearch.
+const mockExecuteScript = vi.fn(() => Promise.resolve([{ result: '[]' }]));
+(chrome.scripting.executeScript as ReturnType<typeof vi.fn>) = mockExecuteScript;
+
+// Mock chrome.tabs.update for retry navigation.
+const mockTabsUpdate = vi.fn((tabId: number) =>
+  Promise.resolve({ id: tabId, title: 'Updated', windowId: 1 }),
+);
+(chrome.tabs.update as ReturnType<typeof vi.fn>) = mockTabsUpdate;
 
 // Now it's safe to import
 const {
@@ -283,80 +285,56 @@ describe('runBrowserSearch', () => {
   ]);
 
   beforeEach(() => {
-    mockExecuteBrowser.mockReset();
     mockTabsCreate.mockReset();
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 99, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 99, title: '', url: opts.url, windowId: 1, status: 'complete' }),
+    );
+    mockTabsGet.mockReset();
+    mockTabsGet.mockImplementation((tabId: number) =>
+      Promise.resolve({ id: tabId, title: 'Test', url: 'https://test.com', status: 'complete' }),
+    );
+    mockTabsRemove.mockReset();
+    mockTabsRemove.mockImplementation(() => Promise.resolve());
+    mockExecuteScript.mockReset();
+    mockExecuteScript.mockImplementation(() => Promise.resolve([{ result: mockSearchResults }]));
+    mockTabsUpdate.mockReset();
+    mockTabsUpdate.mockImplementation((tabId: number) =>
+      Promise.resolve({ id: tabId, title: 'Updated', windowId: 1 }),
     );
   });
 
-  it('calls navigate → evaluate → close in sequence (tab created via chrome.tabs.create)', async () => {
-    const calls: string[] = [];
+  it('creates tab with search URL, evaluates, and closes (no CDP)', async () => {
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 42, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 42, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
-
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      calls.push(args.action as string);
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [42] to https://www.google.com/search?q=test';
-        case 'evaluate':
-          return mockSearchResults;
-        case 'close':
-          return 'Closed tab [42].';
-        default:
-          return '';
-      }
-    });
 
     await runBrowserSearch('test', 5, 'google');
 
-    expect(mockTabsCreate).toHaveBeenCalledWith({ url: 'about:blank', active: false });
-    expect(calls).toEqual(['navigate', 'evaluate', 'close']);
+    // Tab created directly with search URL (not about:blank)
+    expect(mockTabsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('google.com/search?q=test'), active: false }),
+    );
+    // Evaluate called via chrome.scripting.executeScript
+    expect(mockExecuteScript).toHaveBeenCalled();
+    // Tab closed via chrome.tabs.remove
+    expect(mockTabsRemove).toHaveBeenCalledWith(42);
   });
 
-  it('opens about:blank in background then navigates to the search URL', async () => {
+  it('creates tab directly with search URL (no about:blank intermediate)', async () => {
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 10, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 10, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          expect(args.tabId).toBe(10);
-          expect(args.url).toContain('google.com/search?q=seattle%20news');
-          return 'Navigated tab [10]';
-        case 'evaluate':
-          return mockSearchResults;
-        case 'close':
-          return 'Closed tab [10].';
-        default:
-          return '';
-      }
-    });
-
     await runBrowserSearch('seattle news', 5, 'google');
-    expect(mockTabsCreate).toHaveBeenCalledWith({ url: 'about:blank', active: false });
+    expect(mockTabsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('google.com/search?q=seattle%20news') }),
+    );
   });
 
   it('returns parsed search results', async () => {
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 1, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 1, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
-
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [1]';
-        case 'evaluate':
-          return mockSearchResults;
-        case 'close':
-          return 'Closed tab [1].';
-        default:
-          return '';
-      }
-    });
 
     const results = await runBrowserSearch('test', 5, 'google');
 
@@ -370,22 +348,13 @@ describe('runBrowserSearch', () => {
     vi.useFakeTimers();
     let evaluateCallCount = 0;
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 5, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 5, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [5]';
-        case 'evaluate':
-          evaluateCallCount++;
-          if (evaluateCallCount === 1) return '[]';
-          return mockSearchResults;
-        case 'close':
-          return 'Closed tab [5].';
-        default:
-          return '';
-      }
+    mockExecuteScript.mockImplementation(() => {
+      evaluateCallCount++;
+      if (evaluateCallCount === 1) return Promise.resolve([{ result: '[]' }]);
+      return Promise.resolve([{ result: mockSearchResults }]);
     });
 
     const promise = runBrowserSearch('test', 5, 'google');
@@ -402,26 +371,13 @@ describe('runBrowserSearch', () => {
   it('returns empty array after all poll attempts fail (initial + retry)', async () => {
     vi.useFakeTimers();
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 7, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 7, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [7]';
-        case 'evaluate':
-          return args.expression && (args.expression as string).includes('document.title')
-            ? JSON.stringify({ title: 'Google', text: 'No results found' })
-            : '[]';
-        case 'close':
-          return 'Closed tab [7].';
-        default:
-          return '';
-      }
-    });
+    mockExecuteScript.mockImplementation(() => Promise.resolve([{ result: '[]' }]));
 
     const promise = runBrowserSearch('test query with "quoted" stuff', 5, 'google');
-    // Flush poll delays: 3 initial attempts (2 waits) + diagnostics + retry nav + 3 retry attempts (2 waits)
+    // Flush poll delays: 3 initial attempts (2 waits) + retry nav + 3 retry attempts (2 waits)
     await vi.advanceTimersByTimeAsync(10000);
     const results = await promise;
 
@@ -430,53 +386,35 @@ describe('runBrowserSearch', () => {
   });
 
   it('always closes the tab even if evaluate throws', async () => {
-    let closeCalled = false;
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 3, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 3, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [3]';
-        case 'evaluate':
-          return 'Error: Runtime.evaluate failed';
-        case 'close':
-          closeCalled = true;
-          return 'Closed tab [3].';
-        default:
-          return '';
-      }
-    });
+    mockExecuteScript.mockImplementation(() => Promise.resolve([{ result: 'Error: Runtime.evaluate failed' }]));
 
     await expect(runBrowserSearch('test', 5, 'google')).rejects.toThrow(
       'Browser search extraction failed',
     );
-    expect(closeCalled).toBe(true);
+    expect(mockTabsRemove).toHaveBeenCalledWith(3);
   });
 
-  it('always closes the tab even if navigate fails', async () => {
-    let closeCalled = false;
+  it('always closes the tab even if page load times out', async () => {
+    vi.useFakeTimers();
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 4, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 4, title: '', url: opts.url, windowId: 1, status: 'loading' }),
+    );
+    // Tab never completes loading — waitForTabLoad checks chrome.tabs.get first
+    mockTabsGet.mockImplementation((tabId: number) =>
+      Promise.resolve({ id: tabId, title: 'Test', url: 'https://test.com', status: 'loading' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Error: Navigation failed — net::ERR_NAME_NOT_RESOLVED';
-        case 'close':
-          closeCalled = true;
-          return 'Closed tab [4].';
-        default:
-          return '';
-      }
-    });
+    const promise = runBrowserSearch('test', 5, 'google');
+    // Advance past the load timeout (15s)
+    await vi.advanceTimersByTimeAsync(20000);
 
-    await expect(runBrowserSearch('test', 5, 'google')).rejects.toThrow(
-      'Browser search navigation failed',
-    );
-    expect(closeCalled).toBe(true);
+    await expect(promise).rejects.toThrow('Page load timed out');
+    expect(mockTabsRemove).toHaveBeenCalledWith(4);
+    vi.useRealTimers();
   });
 
   it('throws when tab fails to open', async () => {
@@ -491,21 +429,10 @@ describe('runBrowserSearch', () => {
 
   it('throws descriptive error when evaluate returns malformed JSON', async () => {
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 6, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 6, title: '', url: opts.url, windowId: 1, status: 'complete' }),
     );
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          return 'Navigated tab [6]';
-        case 'evaluate':
-          return '<html>not json</html>';
-        case 'close':
-          return 'Closed tab [6].';
-        default:
-          return '';
-      }
-    });
+    mockExecuteScript.mockImplementation(() => Promise.resolve([{ result: '<html>not json</html>' }]));
 
     await expect(runBrowserSearch('test', 5, 'google')).rejects.toThrow(
       'Browser search: failed to parse results from google',
@@ -513,33 +440,19 @@ describe('runBrowserSearch', () => {
   });
 
   it('uses correct search URL per engine', async () => {
-    const navigatedUrls: string[] = [];
-    mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 1, title: '', url: opts.url, windowId: 1 }),
-    );
-
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          navigatedUrls.push(args.url as string);
-          return 'Navigated tab [1]';
-        case 'evaluate':
-          // Return results on first attempt to avoid polling delays
-          return mockSearchResults;
-        case 'close':
-          return 'Closed tab [1].';
-        default:
-          return '';
-      }
+    const createdUrls: string[] = [];
+    mockTabsCreate.mockImplementation((opts: { url: string }) => {
+      createdUrls.push(opts.url);
+      return Promise.resolve({ id: 1, title: '', url: opts.url, windowId: 1, status: 'complete' });
     });
 
     await runBrowserSearch('weather', 3, 'google');
     await runBrowserSearch('weather', 3, 'bing');
     await runBrowserSearch('weather', 3, 'duckduckgo');
 
-    expect(navigatedUrls[0]).toContain('google.com/search?q=weather');
-    expect(navigatedUrls[1]).toContain('bing.com/search?q=weather');
-    expect(navigatedUrls[2]).toContain('duckduckgo.com/html/?q=weather');
+    expect(createdUrls[0]).toContain('google.com/search?q=weather');
+    expect(createdUrls[1]).toContain('bing.com/search?q=weather');
+    expect(createdUrls[2]).toContain('duckduckgo.com/html/?q=weather');
   });
 });
 
@@ -862,41 +775,44 @@ describe('simplifyQuery', () => {
 
 describe('runBrowserSearch retry with simplified query', () => {
   beforeEach(() => {
-    mockExecuteBrowser.mockReset();
     mockTabsCreate.mockReset();
     mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 99, title: '', url: opts.url, windowId: 1 }),
+      Promise.resolve({ id: 99, title: '', url: opts.url, windowId: 1, status: 'complete' }),
+    );
+    mockTabsGet.mockReset();
+    mockTabsGet.mockImplementation((tabId: number) =>
+      Promise.resolve({ id: tabId, title: 'Test', url: 'https://test.com', status: 'complete' }),
+    );
+    mockTabsRemove.mockReset();
+    mockTabsRemove.mockImplementation(() => Promise.resolve());
+    mockExecuteScript.mockReset();
+    mockTabsUpdate.mockReset();
+    mockTabsUpdate.mockImplementation((tabId: number) =>
+      Promise.resolve({ id: tabId, title: 'Updated', windowId: 1 }),
     );
   });
 
   it('retries with simplified query when initial search returns empty', async () => {
     vi.useFakeTimers();
-    const navigatedUrls: string[] = [];
+    const createdUrls: string[] = [];
+    const updatedUrls: string[] = [];
     let evaluateCallCount = 0;
-    mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 20, title: '', url: opts.url, windowId: 1 }),
-    );
+    mockTabsCreate.mockImplementation((opts: { url: string }) => {
+      createdUrls.push(opts.url);
+      return Promise.resolve({ id: 20, title: '', url: opts.url, windowId: 1, status: 'complete' });
+    });
+    mockTabsUpdate.mockImplementation((tabId: number, props: { url?: string }) => {
+      if (props.url) updatedUrls.push(props.url);
+      return Promise.resolve({ id: tabId, title: 'Updated', windowId: 1 });
+    });
 
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          navigatedUrls.push(args.url as string);
-          return 'Navigated tab [20]';
-        case 'evaluate':
-          if (args.expression && (args.expression as string).includes('document.title')) {
-            return JSON.stringify({ title: 'CAPTCHA', text: 'unusual traffic' });
-          }
-          evaluateCallCount++;
-          // First 3 attempts (initial) return empty, next 3 (retry) return results
-          if (evaluateCallCount <= 3) return '[]';
-          return JSON.stringify([
-            { title: 'Result', url: 'https://example.com', snippet: 'Found it' },
-          ]);
-        case 'close':
-          return 'Closed tab [20].';
-        default:
-          return '';
-      }
+    mockExecuteScript.mockImplementation(() => {
+      evaluateCallCount++;
+      // First 3 attempts (initial) return empty, next 3 (retry) return results
+      if (evaluateCallCount <= 3) return Promise.resolve([{ result: '[]' }]);
+      return Promise.resolve([{ result: JSON.stringify([
+        { title: 'Result', url: 'https://example.com', snippet: 'Found it' },
+      ]) }]);
     });
 
     const promise = runBrowserSearch('"complex" "query" "with" "many" "quotes"', 5, 'google');
@@ -907,42 +823,34 @@ describe('runBrowserSearch retry with simplified query', () => {
     expect(results).toHaveLength(1);
     expect(results[0].title).toBe('Result');
 
-    // Should have navigated twice (initial + retry)
-    expect(navigatedUrls).toHaveLength(2);
+    // Initial URL via chrome.tabs.create, retry URL via chrome.tabs.update
+    expect(createdUrls).toHaveLength(1);
+    expect(updatedUrls).toHaveLength(1);
 
     // Retry URL should not contain quoted terms
-    const retryUrl = decodeURIComponent(navigatedUrls[1]);
+    const retryUrl = decodeURIComponent(updatedUrls[0]);
     expect(retryUrl).not.toContain('"');
 
     vi.useRealTimers();
   });
 
   it('sanitizes query before first search', async () => {
-    const navigatedUrls: string[] = [];
-    mockTabsCreate.mockImplementation((opts: { url: string }) =>
-      Promise.resolve({ id: 21, title: '', url: opts.url, windowId: 1 }),
-    );
-
-    mockExecuteBrowser.mockImplementation(async (args: Record<string, unknown>) => {
-      switch (args.action) {
-        case 'navigate':
-          navigatedUrls.push(args.url as string);
-          return 'Navigated tab [21]';
-        case 'evaluate':
-          return JSON.stringify([
-            { title: 'Result', url: 'https://example.com', snippet: 'Snippet' },
-          ]);
-        case 'close':
-          return 'Closed tab [21].';
-        default:
-          return '';
-      }
+    const createdUrls: string[] = [];
+    mockTabsCreate.mockImplementation((opts: { url: string }) => {
+      createdUrls.push(opts.url);
+      return Promise.resolve({ id: 21, title: '', url: opts.url, windowId: 1, status: 'complete' });
     });
+
+    mockExecuteScript.mockImplementation(() =>
+      Promise.resolve([{ result: JSON.stringify([
+        { title: 'Result', url: 'https://example.com', snippet: 'Snippet' },
+      ]) }]),
+    );
 
     // Use smart quotes — they should be replaced with regular quotes
     await runBrowserSearch('\u201csmart quoted\u201d query', 5, 'google');
 
-    const searchUrl = decodeURIComponent(navigatedUrls[0]);
+    const searchUrl = decodeURIComponent(createdUrls[0]);
     expect(searchUrl).not.toContain('\u201c');
     expect(searchUrl).not.toContain('\u201d');
     expect(searchUrl).toContain('"smart quoted"');

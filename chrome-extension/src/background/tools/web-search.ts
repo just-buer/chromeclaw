@@ -1,4 +1,3 @@
-import { executeBrowser } from './browser';
 import {
   normalizeCacheKey,
   readCache,
@@ -10,16 +9,9 @@ import {
 import { createLogger } from '../logging/logger-buffer';
 import { toolConfigStorage } from '@extension/storage';
 import { Type } from '@sinclair/typebox';
-import type { BrowserArgs } from './browser';
 import type { CacheEntry } from './web-shared';
 import type { WebSearchProviderConfig, BrowserSearchEngine } from '@extension/storage';
 import type { Static } from '@sinclair/typebox';
-
-/** Web search only uses non-screenshot browser actions, so the result is always a string. */
-const executeBrowserText = async (args: BrowserArgs): Promise<string> => {
-  const result = await executeBrowser(args);
-  return typeof result === 'string' ? result : JSON.stringify(result);
-};
 
 const searchLog = createLogger('tool');
 
@@ -100,8 +92,75 @@ const runTavilySearch = async (
 };
 
 // ---------------------------------------------------------------------------
-// Browser provider — uses executeBrowser to search via Google/Bing/DuckDuckGo
+// Browser provider — tab + scripting APIs (no CDP / chrome.debugger needed)
 // ---------------------------------------------------------------------------
+
+const TAB_LOAD_TIMEOUT_MS = 15_000;
+
+/** Wait for a tab to finish loading (status === 'complete'). */
+const waitForTabLoad = async (tabId: number, timeoutMs = TAB_LOAD_TIMEOUT_MS): Promise<void> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Page load timed out'));
+    }, timeoutMs);
+
+    const onUpdated = (updatedTabId: number, changeInfo: { status?: string }) => {
+      if (updatedTabId === tabId && changeInfo.status === 'complete') {
+        cleanup();
+        resolve();
+      }
+    };
+
+    const onRemoved = (removedTabId: number) => {
+      if (removedTabId === tabId) {
+        cleanup();
+        reject(new Error('Tab was closed before loading completed'));
+      }
+    };
+
+    // Register listeners FIRST, then check current status to close the TOCTOU race.
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+
+    chrome.tabs.get(tabId).then(tab => {
+      if (tab.status === 'complete') {
+        cleanup();
+        resolve();
+      }
+    }).catch(() => {
+      // Tab may have been removed — timeout will handle it
+    });
+  });
+
+/** Evaluate a JS expression in a tab using chrome.scripting (no CDP). */
+const scriptEvaluate = async (tabId: number, expression: string): Promise<string> => {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN' as chrome.scripting.ExecutionWorld, // MAIN world needed to eval in page context
+    func: (expr: string) => {
+      try {
+        const result = eval(expr);
+        if (result === undefined) return 'undefined';
+        return typeof result === 'string' ? result : JSON.stringify(result);
+      } catch (err) {
+        return `Error: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    },
+    args: [expression],
+  });
+  return results?.[0]?.result ?? 'Error: No result from script evaluation';
+};
 
 /** Build the search URL for a given engine. */
 const buildSearchUrl = (engine: BrowserSearchEngine, query: string): string => {
@@ -247,7 +306,7 @@ const pollForResults = async (
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    const evalResult = await executeBrowserText({ action: 'evaluate', tabId, expression });
+    const evalResult = await scriptEvaluate(tabId, expression);
     searchLog.trace('[browser] evaluate attempt', {
       attempt: attempt + 1,
       rawLength: evalResult.length,
@@ -301,8 +360,8 @@ const runBrowserSearch = async (
     sanitizedQuery,
   });
 
-  // 1. Open a blank background tab, then navigate (which waits for Page.loadEventFired)
-  const openedTab = await chrome.tabs.create({ url: 'about:blank', active: false });
+  // 1. Open a background tab directly with the search URL (no CDP needed)
+  const openedTab = await chrome.tabs.create({ url: searchUrl, active: false });
   const tabId = openedTab.id ?? null;
   searchLog.trace('[browser] opened background tab', { tabId });
   if (tabId == null) {
@@ -310,15 +369,12 @@ const runBrowserSearch = async (
   }
 
   try {
-    // 2. Navigate to search URL — executeBrowser 'navigate' waits for page load
-    const navResult = await executeBrowserText({ action: 'navigate', tabId, url: searchUrl });
-    searchLog.trace('[browser] navigate result', { navResult: navResult.slice(0, 200) });
-    if (navResult.startsWith('Error:')) {
-      throw new Error(`Browser search navigation failed: ${navResult}`);
-    }
+    // 2. Wait for the page to finish loading
+    await waitForTabLoad(tabId);
+    searchLog.trace('[browser] tab loaded', { tabId });
 
     // 3. Poll for results — search engines render results asynchronously via JS
-    //    after Page.loadEventFired, so we retry extraction with a short delay.
+    //    after load, so we retry extraction with a short delay.
     const expression = getExtractionExpression(maxResults);
     const results = await pollForResults(tabId, expression, engine, POLL_MAX_ATTEMPTS);
 
@@ -335,12 +391,7 @@ const runBrowserSearch = async (
     });
     let diagnostics: string | undefined;
     try {
-      const diagResult = await executeBrowserText({
-        action: 'evaluate',
-        tabId,
-        expression: PAGE_DIAGNOSTICS_EXPR,
-      });
-      diagnostics = diagResult;
+      diagnostics = await scriptEvaluate(tabId, PAGE_DIAGNOSTICS_EXPR);
     } catch {
       // Diagnostics are best-effort
     }
@@ -362,9 +413,11 @@ const runBrowserSearch = async (
     const retryUrl = buildSearchUrl(engine, simplified);
     searchLog.trace('[browser] retry with simplified query', { simplified, retryUrl });
 
-    const retryNavResult = await executeBrowserText({ action: 'navigate', tabId, url: retryUrl });
-    if (retryNavResult.startsWith('Error:')) {
-      searchLog.trace('[browser] retry navigation failed', { retryNavResult });
+    await chrome.tabs.update(tabId, { url: retryUrl });
+    try {
+      await waitForTabLoad(tabId);
+    } catch (err) {
+      searchLog.trace('[browser] retry navigation failed', { error: String(err) });
       return [];
     }
 
@@ -382,7 +435,7 @@ const runBrowserSearch = async (
   } finally {
     // Always close the tab
     searchLog.trace('[browser] closing search tab', { tabId });
-    await executeBrowserText({ action: 'close', tabId }).catch(() => {
+    await chrome.tabs.remove(tabId).catch(() => {
       // Ignore cleanup errors
     });
   }
