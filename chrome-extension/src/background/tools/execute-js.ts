@@ -523,6 +523,7 @@ ${maybeAutoReturn(file.content)}
     // Enable the tool in agent's tool config
     const toolConfig = agent.toolConfig ?? {
       enabledTools: {},
+      requireApprovalTools: {},
       webSearchConfig: {
         provider: 'tavily',
         tavily: { apiKey: '' },
@@ -553,6 +554,7 @@ ${maybeAutoReturn(file.content)}
     // Disable the tool in agent's tool config
     const toolConfig = agent.toolConfig ?? {
       enabledTools: {},
+      requireApprovalTools: {},
       webSearchConfig: {
         provider: 'tavily',
         tavily: { apiKey: '' },
@@ -599,6 +601,7 @@ const executeJsToolDef: ToolRegistration = {
     'register (parse tool metadata and save), unregister (remove a custom tool). ' +
     'Supports configurable timeout, module registry (exportAs), and console output capture.',
   schema: executeJsSchema,
+  requiresApproval: true,
   execute: args => executeJs(args as any),
 };
 

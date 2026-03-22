@@ -31,6 +31,8 @@ const agentLoop = (
   config: AgentLoopConfig,
   signal?: AbortSignal,
   streamFn?: StreamFn,
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>,
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
 ): EventStream<AgentEvent, AgentMessage[]> => {
   const stream = createAgentStream();
 
@@ -49,7 +51,7 @@ const agentLoop = (
     }
 
     try {
-      await runLoop(currentContext, newMessages, config, signal, stream, streamFn);
+      await runLoop(currentContext, newMessages, config, signal, stream, streamFn, onApprovalRequest, onShouldApprove);
     } catch (err) {
       emitLoopError(err, newMessages, stream, config);
     }
@@ -66,6 +68,8 @@ const agentLoopContinue = (
   config: AgentLoopConfig,
   signal?: AbortSignal,
   streamFn?: StreamFn,
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>,
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
 ): EventStream<AgentEvent, AgentMessage[]> => {
   if (context.messages.length === 0) {
     throw new Error('Cannot continue: no messages in context');
@@ -85,7 +89,7 @@ const agentLoopContinue = (
     stream.push({ type: 'turn_start' });
 
     try {
-      await runLoop(currentContext, newMessages, config, signal, stream, streamFn);
+      await runLoop(currentContext, newMessages, config, signal, stream, streamFn, onApprovalRequest, onShouldApprove);
     } catch (err) {
       emitLoopError(err, newMessages, stream, config);
     }
@@ -196,6 +200,8 @@ const runLoop = async (
   signal: AbortSignal | undefined,
   stream: EventStream<AgentEvent, AgentMessage[]>,
   streamFn?: StreamFn,
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>,
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
 ): Promise<void> => {
   let firstTurn = true;
   let pendingMessages: AgentMessage[] = (await config.getSteeringMessages?.()) || [];
@@ -252,6 +258,8 @@ const runLoop = async (
           stream,
           config.getSteeringMessages,
           toolLoopState,
+          onApprovalRequest,
+          onShouldApprove,
         );
         toolResults.push(...toolExecution.toolResults);
         steeringAfterTools = toolExecution.steeringMessages ?? null;
@@ -393,6 +401,8 @@ const executeToolCalls = async (
   stream: EventStream<AgentEvent, AgentMessage[]>,
   getSteeringMessages?: AgentLoopConfig['getSteeringMessages'],
   toolLoopState?: ToolLoopState,
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>,
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
 ): Promise<{ toolResults: ToolResultMessage[]; steeringMessages?: AgentMessage[] }> => {
   const toolCalls = assistantMessage.content.filter(c => c.type === 'toolCall');
   const results: ToolResultMessage[] = [];
@@ -471,6 +481,56 @@ const executeToolCalls = async (
 
     try {
       if (!tool) throw new Error(`Tool ${toolCall.name} not found`);
+
+      // ── Human-in-the-loop approval gate ──
+      const staticApproval = (tool as { requiresApproval?: boolean }).requiresApproval ?? false;
+      const dynamicApproval =
+        !staticApproval && onShouldApprove
+          ? await onShouldApprove(toolCall.name, toolCall.arguments as Record<string, unknown>)
+          : false;
+      const needsApproval = staticApproval || dynamicApproval;
+      if (needsApproval && onApprovalRequest) {
+        const decision = await onApprovalRequest(
+          toolCall.id,
+          toolCall.name,
+          toolCall.arguments as Record<string, unknown>,
+        );
+        if (!decision.approved) {
+          const denyMsg = decision.denyReason
+            ? `Tool execution denied by user: ${decision.denyReason}`
+            : 'Tool execution denied by user.';
+          result = {
+            content: [{ type: 'text', text: denyMsg }],
+            details: {},
+          };
+          isError = true;
+
+          stream.push({
+            type: 'tool_execution_end',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            result,
+            isError,
+          });
+
+          const deniedResultMessage: ToolResultMessage = {
+            role: 'toolResult',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: result.content,
+            details: {},
+            isError,
+            timestamp: Date.now(),
+          };
+          results.push(deniedResultMessage);
+          stream.push({ type: 'message_start', message: deniedResultMessage });
+          stream.push({ type: 'message_end', message: deniedResultMessage });
+          if (toolLoopState) {
+            await recordToolCallOutcome(toolLoopState, toolCall.id, result);
+          }
+          continue;
+        }
+      }
 
       const validatedArgs = validateToolArguments(tool, toolCall);
 

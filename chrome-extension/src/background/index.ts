@@ -1,5 +1,5 @@
 import 'webextension-polyfill';
-import { handleLLMStream } from './agents/stream-handler';
+import { handleLLMStream, handleApprovalResponse } from './agents/stream-handler';
 import { initChannels, validateChannelAuth, toggleChannel } from './channels';
 import { saveChannelConfig, getChannelConfig, createDefaultChannelConfig } from './channels/config';
 import {
@@ -26,7 +26,7 @@ import { setCronServiceRef } from './tools/scheduler';
 import { createKeepAliveManager } from './utils/keep-alive';
 import { initSidePanelBehavior } from '@extension/shared';
 import { getScheduledTask } from '@extension/storage';
-import type { LLMRequestMessage } from '@extension/shared';
+import type { LLMRequestMessage, LLMToolApprovalResponse } from '@extension/shared';
 
 // ── Port Listener for LLM Streaming ───────────
 
@@ -444,6 +444,10 @@ chrome.runtime.onConnect.addListener(port => {
     port.onMessage.addListener((msg: Record<string, unknown>) => {
       if (msg.type === 'LLM_REQUEST') {
         handleLLMStream(port, msg as unknown as LLMRequestMessage);
+      }
+      if (msg.type === 'LLM_TOOL_APPROVAL_RESPONSE') {
+        // Forward to the active stream handler for the given chatId
+        handleApprovalResponse(msg as unknown as LLMToolApprovalResponse & { chatId: string });
       }
     });
   }

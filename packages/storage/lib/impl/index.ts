@@ -29,3 +29,14 @@ export {
 } from './embedding-config-storage.js';
 export { webCredentialsStorage, type WebProviderCredential } from './web-credentials-storage.js';
 export { mcpServersStorage, type McpServerConfig } from './mcp-servers-storage.js';
+export {
+  approvalRulesStorage,
+  type ApprovalRule,
+  type ApprovalCondition,
+  type ApprovalConditionAlways,
+  type ApprovalConditionKeyword,
+  type ApprovalConditionThreshold,
+  type ApprovalConditionFieldEquals,
+  type ApprovalConditionAnd,
+  type ApprovalConditionOr,
+} from './approval-rules-storage.js';

@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   CircleIcon,
   ClockIcon,
+  ShieldAlertIcon,
   WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ type ToolHeaderProps = {
 const statusLabels: Record<ToolPartState, string> = {
   'input-streaming': 'Pending',
   'input-available': 'Running',
+  'pending-approval': 'Awaiting approval',
   'output-available': 'Completed',
   'output-error': 'Error',
 };
@@ -33,6 +35,7 @@ const statusLabels: Record<ToolPartState, string> = {
 const statusIcons: Record<ToolPartState, ReactNode> = {
   'input-streaming': <CircleIcon className="size-4" />,
   'input-available': <ClockIcon className="size-4 animate-pulse" />,
+  'pending-approval': <ShieldAlertIcon className="size-4 text-yellow-500" />,
   'output-available': <CheckCircleIcon className="size-4 text-green-600" />,
   'output-error': <XCircleIcon className="size-4 text-red-600" />,
 };

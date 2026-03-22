@@ -162,7 +162,7 @@ const Chat = ({
 
   const [isCompacting, setIsCompacting] = useState(false);
 
-  const { messages, setMessages, sendMessage, status, stop, input, setInput } = useLLMStream({
+  const { messages, setMessages, sendMessage, status, stop, input, setInput, approveToolCall } = useLLMStream({
     chatId,
     model: selectedModel,
     onStreamComplete: handleStreamCompleteWithUsage,
@@ -249,6 +249,8 @@ const Chat = ({
           activeSubagents={activeSubagents}
           chatId={chatId}
           messages={messages}
+          onApprove={(toolCallId) => approveToolCall(toolCallId, true)}
+          onDeny={(toolCallId, reason) => approveToolCall(toolCallId, false, reason)}
           onEditSubmit={handleEditSubmit}
           onSendMessage={(content: string) => sendMessage(content)}
           onStopSubagent={onStopSubagent}

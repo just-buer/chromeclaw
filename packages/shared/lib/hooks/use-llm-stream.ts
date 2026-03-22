@@ -10,6 +10,7 @@ import type {
   LLMStreamChunk,
   LLMStreamEnd,
   LLMStreamError,
+  LLMToolApprovalRequest,
   ToolPartState,
 } from '../chat-types.js';
 
@@ -36,6 +37,7 @@ interface UseLLMStreamReturn {
   stop: () => void;
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
+  approveToolCall: (toolCallId: string, approved: boolean, denyReason?: string) => void;
 }
 
 const useLLMStream = ({
@@ -119,7 +121,6 @@ const useLLMStream = ({
           ];
         });
       }
-
       if (chunk.toolResult) {
         updateAssistantPart(parts => {
           let updated = parts.map(p => {
@@ -192,6 +193,33 @@ const useLLMStream = ({
       }
     },
     [updateAssistantPart, onStreamComplete],
+  );
+
+  const handleApprovalRequest = useCallback(
+    (req: LLMToolApprovalRequest) => {
+      // Update the tool-call part state to pending-approval and attach matched rule info
+      updateAssistantPart(parts =>
+        parts.map(p =>
+          p.type === 'tool-call' && p.toolCallId === req.toolCallId
+            ? { ...p, state: 'pending-approval' as ToolPartState, matchedRule: req.matchedRule }
+            : p,
+        ),
+      );
+    },
+    [updateAssistantPart],
+  );
+
+  const approveToolCall = useCallback(
+    (toolCallId: string, approved: boolean, denyReason?: string) => {
+      portRef.current?.postMessage({
+        type: 'LLM_TOOL_APPROVAL_RESPONSE',
+        toolCallId,
+        approved,
+        denyReason,
+        chatId,
+      });
+    },
+    [chatId],
   );
 
   const sendMessage = useCallback(
@@ -268,6 +296,9 @@ const useLLMStream = ({
             case 'LLM_STREAM_ERROR':
               handleError(msg as unknown as LLMStreamError);
               break;
+            case 'LLM_TOOL_APPROVAL_REQUEST':
+              handleApprovalRequest(msg as unknown as LLMToolApprovalRequest);
+              break;
             case 'LLM_TTS_AUDIO':
               onTtsAudio?.(
                 msg.audioBase64 as string,
@@ -308,6 +339,7 @@ const useLLMStream = ({
       handleChunk,
       handleEnd,
       handleError,
+      handleApprovalRequest,
       onChatCreated,
       onUserMessageCreated,
       onTtsAudio,
@@ -341,6 +373,7 @@ const useLLMStream = ({
     stop,
     input,
     setInput,
+    approveToolCall,
   };
 };
 

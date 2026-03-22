@@ -15,6 +15,10 @@ interface McpServerConfig {
    *   tries Streamable HTTP first, falls back to SSE (used by mcp-proxy).
    */
   transport?: 'streamable-http' | 'sse';
+  /** When true, all tools on this server require user approval before execution (default: false). */
+  requireApproval?: boolean;
+  /** Per-tool approval overrides. Key = tool name. Overrides requireApproval when set. */
+  toolApprovalOverrides?: Record<string, boolean>;
 }
 
 export const mcpServersStorage = createStorage<McpServerConfig[]>('mcp-servers', [], {

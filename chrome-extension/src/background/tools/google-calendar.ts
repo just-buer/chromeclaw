@@ -247,6 +247,7 @@ const calendarToolDefs: ToolRegistration[] = [
     description:
       'Create a Google Calendar event. Requires summary, startTime, and endTime in ISO 8601 format.',
     schema: calendarCreateSchema,
+    requiresApproval: true,
     execute: args => executeCalendarCreate(args as CalendarCreateArgs),
     formatResult: jsonFormatResult,
   },
@@ -256,6 +257,7 @@ const calendarToolDefs: ToolRegistration[] = [
     description:
       'Update an existing Google Calendar event. Requires eventId plus any fields to change.',
     schema: calendarUpdateSchema,
+    requiresApproval: true,
     execute: args => executeCalendarUpdate(args as CalendarUpdateArgs),
     formatResult: jsonFormatResult,
   },
@@ -264,6 +266,7 @@ const calendarToolDefs: ToolRegistration[] = [
     label: 'Calendar Delete',
     description: 'Delete a Google Calendar event by event ID.',
     schema: calendarDeleteSchema,
+    requiresApproval: true,
     execute: args => executeCalendarDelete(args as CalendarDeleteArgs),
     formatResult: jsonFormatResult,
   },

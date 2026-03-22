@@ -39,6 +39,8 @@ interface ToolRegistration {
   chromeOnly?: boolean;
   /** If true, executor receives { chatId } context */
   needsContext?: boolean;
+  /** If true, user must approve before the tool executes (default behaviour, overridable by user config) */
+  requiresApproval?: boolean;
   /** Raw executor: (args, context?) → result */
   execute: (args: any, context?: ToolContext) => Promise<unknown>;
   /**

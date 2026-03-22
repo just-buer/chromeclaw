@@ -3,7 +3,12 @@
 // ──────────────────────────────────────────────
 
 /** Tool execution state — mirrors AI SDK's ToolUIPart.state */
-type ToolPartState = 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+type ToolPartState =
+  | 'input-streaming'
+  | 'input-available'
+  | 'pending-approval'
+  | 'output-available'
+  | 'output-error';
 
 /** A single part of a chat message */
 type ChatMessagePart =
@@ -16,6 +21,8 @@ type ChatMessagePart =
       args: Record<string, unknown>;
       result?: unknown;
       state?: ToolPartState;
+      /** Populated when a dynamic approval rule triggered the pending-approval state */
+      matchedRule?: { name: string; message?: string };
     }
   | {
       type: 'tool-result';
@@ -244,6 +251,25 @@ interface LLMTtsAudio {
   isLastChunk?: boolean;
 }
 
+/** Tool approval request — background -> UI, pauses tool execution until user decides */
+interface LLMToolApprovalRequest {
+  type: 'LLM_TOOL_APPROVAL_REQUEST';
+  chatId: string;
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  /** Populated when a dynamic approval rule triggered the request */
+  matchedRule?: { name: string; message?: string };
+}
+
+/** Tool approval response — UI -> background, resumes or cancels tool execution */
+interface LLMToolApprovalResponse {
+  type: 'LLM_TOOL_APPROVAL_RESPONSE';
+  toolCallId: string;
+  approved: boolean;
+  denyReason?: string;
+}
+
 /** Ephemeral progress info for a running subagent (UI-only, not persisted). */
 interface SubagentProgressStep {
   toolCallId: string;
@@ -275,7 +301,9 @@ type PortMessage =
   | LLMStepFinish
   | LLMStreamError
   | LLMStreamRetry
-  | LLMTtsAudio;
+  | LLMTtsAudio
+  | LLMToolApprovalRequest
+  | LLMToolApprovalResponse;
 
 // ──────────────────────────────────────────────
 // Type Guards
@@ -292,6 +320,7 @@ const VALID_STREAMING_STATUSES: StreamingStatus[] = [
 const VALID_TOOL_PART_STATES: ToolPartState[] = [
   'input-streaming',
   'input-available',
+  'pending-approval',
   'output-available',
   'output-error',
 ];
@@ -356,6 +385,8 @@ export type {
   LLMStreamError,
   LLMStreamRetry,
   LLMTtsAudio,
+  LLMToolApprovalRequest,
+  LLMToolApprovalResponse,
   StreamingStatus,
   PortMessage,
 };

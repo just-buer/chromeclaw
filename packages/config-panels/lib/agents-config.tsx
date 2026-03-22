@@ -1127,6 +1127,7 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
 
       const currentToolConfig = agentConfig.toolConfig ?? {
         enabledTools: {},
+        requireApprovalTools: {},
         webSearchConfig: {
           provider: 'tavily' as const,
           tavily: { apiKey: '' },
@@ -1159,12 +1160,50 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
     [agentConfig, agentId, globalConfig, onReload],
   );
 
+  const handleApprovalToggle = useCallback(
+    async (toolName: string, value: boolean) => {
+      if (!agentConfig) return;
+
+      const currentToolConfig = agentConfig.toolConfig ?? {
+        enabledTools: {},
+        requireApprovalTools: {},
+        webSearchConfig: {
+          provider: 'tavily' as const,
+          tavily: { apiKey: '' },
+          browser: { engine: 'google' as const },
+        },
+      };
+      const nextToolConfig = {
+        ...currentToolConfig,
+        requireApprovalTools: { ...(currentToolConfig.requireApprovalTools ?? {}), [toolName]: value },
+      };
+
+      await updateAgent(agentId, { toolConfig: nextToolConfig });
+
+      const activeId = await activeAgentStorage.get();
+      if (activeId === agentId && globalConfig) {
+        const nextGlobal = {
+          ...globalConfig,
+          requireApprovalTools: { ...(globalConfig.requireApprovalTools ?? {}), [toolName]: value },
+        };
+        await toolConfigStorage.set(nextGlobal);
+        setGlobalConfig(nextGlobal);
+      }
+
+      setAgentConfig(prev =>
+        prev ? { ...prev, toolConfig: nextToolConfig, updatedAt: Date.now() } : null,
+      );
+    },
+    [agentConfig, agentId, globalConfig],
+  );
+
   const handleRemoveCustomTool = useCallback(
     async (toolName: string) => {
       if (!agentConfig) return;
       const customTools = (agentConfig.customTools ?? []).filter(ct => ct.name !== toolName);
       const currentToolConfig = agentConfig.toolConfig ?? {
         enabledTools: {},
+        requireApprovalTools: {},
         webSearchConfig: {
           provider: 'tavily' as const,
           tavily: { apiKey: '' },
@@ -1202,12 +1241,19 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
   }
 
   const agentEnabledTools = agentConfig.toolConfig?.enabledTools ?? {};
+  const agentApprovalTools = agentConfig.toolConfig?.requireApprovalTools ?? {};
 
   /** Resolve enabled state: agent override > global config > registry default */
   const isEnabled = (toolName: string, defaultEnabled: boolean): boolean => {
     if (toolName in agentEnabledTools) return agentEnabledTools[toolName];
     if (toolName in globalConfig.enabledTools) return globalConfig.enabledTools[toolName];
     return defaultEnabled;
+  };
+
+  /** Resolve approval state: agent override > global config > false */
+  const isApprovalRequired = (toolName: string): boolean => {
+    if (toolName in agentApprovalTools) return agentApprovalTools[toolName];
+    return globalConfig.requireApprovalTools?.[toolName] ?? false;
   };
 
   const customTools = agentConfig.customTools ?? [];
@@ -1239,6 +1285,7 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                       </div>
                       {group.tools.map(t => {
                         const checkboxId = `agent-tool-${t.name}`;
+                        const approvalId = `agent-tool-approval-${t.name}`;
                         return (
                           <div key={t.name} className="flex items-center justify-between pl-7">
                             <div>
@@ -1247,13 +1294,38 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                               </Label>
                               <p className="text-muted-foreground text-xs">{t.description}</p>
                             </div>
-                            <input
-                              checked={isEnabled(t.name, t.defaultEnabled)}
-                              className="accent-primary size-4"
-                              id={checkboxId}
-                              onChange={e => handleToggle(t.name, e.target.checked)}
-                              type="checkbox"
-                            />
+                            <div className="flex items-center gap-3">
+                              {isEnabled(t.name, t.defaultEnabled) && (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      checked={isApprovalRequired(t.name)}
+                                      className="accent-yellow-500 size-3.5 cursor-pointer"
+                                      id={approvalId}
+                                      onChange={e => handleApprovalToggle(t.name, e.target.checked)}
+                                      title="Require approval before executing"
+                                      type="checkbox"
+                                    />
+                                    <Label
+                                      className="text-muted-foreground cursor-pointer text-xs"
+                                      htmlFor={approvalId}>
+                                      审批
+                                    </Label>
+                                  </div>
+                                  <Separator className="h-4" orientation="vertical" />
+                                </>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <input
+                                  checked={isEnabled(t.name, t.defaultEnabled)}
+                                  className="accent-primary size-4"
+                                  id={checkboxId}
+                                  onChange={e => handleToggle(t.name, e.target.checked)}
+                                  type="checkbox"
+                                />
+                                <span className="text-muted-foreground text-xs">启用</span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -1284,6 +1356,7 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                     </div>
                     {group.tools.map(t => {
                       const checkboxId = `agent-tool-${t.name}`;
+                      const approvalId = `agent-tool-approval-${t.name}`;
                       return (
                         <div
                           key={t.name}
@@ -1294,14 +1367,39 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                             </Label>
                             <p className="text-muted-foreground text-xs">{t.description}</p>
                           </div>
-                          <input
-                            checked={isEnabled(t.name, t.defaultEnabled)}
-                            className={`accent-primary size-4${!isGoogleConnected ? ' pointer-events-none' : ''}`}
-                            disabled={!isGoogleConnected}
-                            id={checkboxId}
-                            onChange={e => handleToggle(t.name, e.target.checked)}
-                            type="checkbox"
-                          />
+                          <div className="flex items-center gap-3">
+                            {isEnabled(t.name, t.defaultEnabled) && isGoogleConnected && (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    checked={isApprovalRequired(t.name)}
+                                    className="accent-yellow-500 size-3.5 cursor-pointer"
+                                    id={approvalId}
+                                    onChange={e => handleApprovalToggle(t.name, e.target.checked)}
+                                    title="Require approval before executing"
+                                    type="checkbox"
+                                  />
+                                  <Label
+                                    className="text-muted-foreground cursor-pointer text-xs"
+                                    htmlFor={approvalId}>
+                                    审批
+                                  </Label>
+                                </div>
+                                <Separator className="h-4" orientation="vertical" />
+                              </>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <input
+                                checked={isEnabled(t.name, t.defaultEnabled)}
+                                className={`accent-primary size-4${!isGoogleConnected ? ' pointer-events-none' : ''}`}
+                                disabled={!isGoogleConnected}
+                                id={checkboxId}
+                                onChange={e => handleToggle(t.name, e.target.checked)}
+                                type="checkbox"
+                              />
+                              <span className="text-muted-foreground text-xs">启用</span>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}

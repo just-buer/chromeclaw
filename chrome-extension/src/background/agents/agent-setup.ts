@@ -115,6 +115,10 @@ export interface RunAgentOpts {
     stepCount: number;
     timedOut: boolean;
   }) => void;
+  /** Called before a tool that requires approval executes. Resolves to user's decision. */
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>;
+  /** Called for every tool call to check if dynamic rules require approval. */
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
 }
 
 /**
@@ -176,6 +180,8 @@ const executeAttempt = async (opts: {
   onToolResult?: RunAgentOpts['onToolResult'];
   onTurnEnd?: RunAgentOpts['onTurnEnd'];
   onAgentEnd?: RunAgentOpts['onAgentEnd'];
+  onApprovalRequest?: RunAgentOpts['onApprovalRequest'];
+  onShouldApprove?: RunAgentOpts['onShouldApprove'];
 }): Promise<RunAgentResult> => {
   const {
     piModel,
@@ -195,6 +201,8 @@ const executeAttempt = async (opts: {
     onToolResult,
     onTurnEnd,
     onAgentEnd,
+    onApprovalRequest,
+    onShouldApprove,
   } = opts;
 
   // Create fresh Agent for this attempt
@@ -207,6 +215,8 @@ const executeAttempt = async (opts: {
     },
     streamFn,
     getApiKey: async () => model.apiKey,
+    onApprovalRequest,
+    onShouldApprove,
   };
   if (convertToLlm) agentOpts.convertToLlm = convertToLlm;
   if (transformContext) agentOpts.transformContext = transformContext;
@@ -434,6 +444,8 @@ export const runAgent = async (opts: RunAgentOpts): Promise<RunAgentResult> => {
     onToolResult,
     onTurnEnd,
     onAgentEnd,
+    onApprovalRequest,
+    onShouldApprove,
   } = opts;
 
   // 1. Build pi-mono primitives (shared across attempts)
@@ -493,6 +505,8 @@ export const runAgent = async (opts: RunAgentOpts): Promise<RunAgentResult> => {
       onToolResult,
       onTurnEnd,
       onAgentEnd,
+      onApprovalRequest,
+      onShouldApprove,
     });
 
     result.retryAttempts = attempt;

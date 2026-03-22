@@ -359,11 +359,15 @@ export async function getRemoteMcpAgentTools(): Promise<AgentTool[]> {
       }
 
       return tools.map(
-        (tool): AgentTool => ({
+        (tool): AgentTool & { requiresApproval?: boolean } => ({
           name: tool.name,
           label: `[${server.name}] ${tool.name}`,
           description: tool.description ?? tool.name,
           parameters: tool.inputSchema as unknown as TObject,
+          requiresApproval:
+            server.toolApprovalOverrides?.[tool.name] ??
+            server.requireApproval ??
+            false,
           execute: async (_toolCallId, params) => {
             try {
               const t = (server.transport ?? 'auto') as McpTransport;

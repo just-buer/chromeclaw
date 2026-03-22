@@ -12,6 +12,7 @@ import {
   BotIcon,
   MessagesSquareIcon,
   ServerIcon,
+  ShieldAlertIcon,
 } from 'lucide-react';
 
 type ConfigTabId =
@@ -26,7 +27,8 @@ type ConfigTabId =
   | 'sessions'
   | 'usage'
   | 'logs'
-  | 'mcp';
+  | 'mcp'
+  | 'approval-rules';
 
 type ConfigTabGroup = {
   label: string;
@@ -57,6 +59,7 @@ const getConfigTabGroups = (): ConfigTabGroup[] => [
       { id: 'general', label: t('tab_general'), icon: SettingsIcon },
       { id: 'model', label: t('tab_models'), icon: BrainCircuitIcon },
       { id: 'mcp', label: t('tab_mcp'), icon: ServerIcon },
+      { id: 'approval-rules', label: '审批规则', icon: ShieldAlertIcon },
       { id: 'actions', label: t('tab_actions'), icon: LightbulbIcon },
       { id: 'logs', label: t('tab_logs'), icon: ScrollTextIcon },
     ],

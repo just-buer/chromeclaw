@@ -18,6 +18,8 @@ interface DeepResearchConfig {
 
 interface ToolConfig {
   enabledTools: Record<string, boolean>;
+  /** Per-tool approval requirement. true = pause and ask user before executing. */
+  requireApprovalTools: Record<string, boolean>;
   webSearchConfig: WebSearchProviderConfig;
   deepResearchConfig?: DeepResearchConfig;
   /** User-provided Google OAuth client ID. When set, tools use launchWebAuthFlow instead of getAuthToken. */
@@ -82,6 +84,7 @@ const defaultEnabledTools: Record<string, boolean> = {
 
 const defaultToolConfig: ToolConfig = {
   enabledTools: { ...defaultEnabledTools },
+  requireApprovalTools: {},
   webSearchConfig: defaultWebSearchConfig,
 };
 
@@ -195,6 +198,7 @@ const toolConfigStorage = {
 
     const merged: ToolConfig = {
       enabledTools,
+      requireApprovalTools: stored.requireApprovalTools ?? {},
       webSearchConfig,
       deepResearchConfig,
       ...(stored.googleClientId ? { googleClientId: stored.googleClientId } : {}),

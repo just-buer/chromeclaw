@@ -36,6 +36,10 @@ export interface AgentOptions {
   getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
   thinkingBudgets?: ThinkingBudgets;
   maxRetryDelayMs?: number;
+  /** Called before a tool executes when requiresApproval is true. Resolves to { approved, denyReason }. */
+  onApprovalRequest?: (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<{ approved: boolean; denyReason?: string }>;
+  /** Called for every tool call to check if dynamic rules require approval. Returns true to trigger approval flow. */
+  onShouldApprove?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
 }
 
 export class Agent {
@@ -59,6 +63,8 @@ export class Agent {
   private resolveRunningPrompt?: () => void;
   private _thinkingBudgets?: ThinkingBudgets;
   private _maxRetryDelayMs?: number;
+  private _onApprovalRequest?: AgentOptions['onApprovalRequest'];
+  private _onShouldApprove?: AgentOptions['onShouldApprove'];
 
   constructor(opts: AgentOptions = {}) {
     this._state = {
@@ -82,6 +88,8 @@ export class Agent {
     this.getApiKey = opts.getApiKey;
     this._thinkingBudgets = opts.thinkingBudgets;
     this._maxRetryDelayMs = opts.maxRetryDelayMs;
+    this._onApprovalRequest = opts.onApprovalRequest;
+    this._onShouldApprove = opts.onShouldApprove;
   }
 
   get sessionId(): string | undefined {
@@ -330,8 +338,8 @@ export class Agent {
 
     try {
       const stream = messages
-        ? agentLoop(messages, context, config, this.abortController.signal, this.streamFn)
-        : agentLoopContinue(context, config, this.abortController.signal, this.streamFn);
+        ? agentLoop(messages, context, config, this.abortController.signal, this.streamFn, this._onApprovalRequest, this._onShouldApprove)
+        : agentLoopContinue(context, config, this.abortController.signal, this.streamFn, this._onApprovalRequest, this._onShouldApprove);
 
       for await (const event of stream) {
         switch (event.type) {

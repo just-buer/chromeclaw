@@ -15,6 +15,7 @@ import { LogViewer } from './log-viewer';
 import { TelegramConfig } from './telegram-config';
 import { WhatsAppConfig } from './whatsapp-config';
 import { McpConfig } from './mcp-config';
+import { ApprovalRulesConfig } from './approval-rules-config';
 
 const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTabId; onOpenSession?: (chatId: string) => void }) => (
   <>
@@ -29,6 +30,7 @@ const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTab
       </>
     )}
     {activeTab === 'mcp' && <McpConfig />}
+    {activeTab === 'approval-rules' && <ApprovalRulesConfig />}
     {activeTab === 'actions' && <SuggestedActionsConfig />}
     {activeTab === 'skills' && <SkillConfig />}
     {activeTab === 'agents' && <AgentsConfig />}

@@ -826,6 +826,7 @@ const Step4ToolsSetup = ({
     try {
       await toolConfigStorage.set({
         enabledTools,
+        requireApprovalTools: {},
         webSearchConfig: defaultWebSearchConfig,
       });
       onNext();

@@ -312,6 +312,7 @@ const gmailToolDefs: ToolRegistration[] = [
     label: 'Gmail Send',
     description: 'Send an email via Gmail. Requires to, subject, and body. Optional cc and bcc.',
     schema: gmailSendSchema,
+    requiresApproval: true,
     execute: args => executeGmailSend(args as GmailSendArgs),
     formatResult: jsonFormatResult,
   },
@@ -321,6 +322,7 @@ const gmailToolDefs: ToolRegistration[] = [
     description:
       'Create a draft email in Gmail. Same parameters as sending but saves as draft instead.',
     schema: gmailDraftSchema,
+    requiresApproval: true,
     execute: args => executeGmailDraft(args as GmailDraftArgs),
     formatResult: jsonFormatResult,
   },

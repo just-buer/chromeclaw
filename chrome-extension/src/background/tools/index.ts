@@ -30,6 +30,9 @@ import type { AgentTool } from '../agents';
 import type { ToolConfig, CustomToolDef } from '@extension/storage';
 import type { TObject } from '@sinclair/typebox';
 
+/** AgentTool extended with approval metadata (local only — not part of pi-agent-core) */
+type ExtendedAgentTool = AgentTool & { requiresApproval?: boolean };
+
 const toolLog = createLogger('tool');
 
 const TOOL_TIMEOUT_MS = 300_000; // 5 minutes
@@ -117,9 +120,9 @@ const buildCustomToolSchema = (params: CustomToolDef['params']) => {
 const getAgentTools = async (opts?: {
   headless?: boolean;
   chatId?: string;
-}): Promise<AgentTool[]> => {
+}): Promise<ExtendedAgentTool[]> => {
   const config = await toolConfigStorage.get();
-  const tools: AgentTool[] = [];
+  const tools: ExtendedAgentTool[] = [];
 
   for (const def of ALL_TOOLS) {
     // Check if enabled
@@ -136,6 +139,10 @@ const getAgentTools = async (opts?: {
       label: def.label,
       description: def.description,
       parameters: def.schema,
+      requiresApproval:
+        config.requireApprovalTools?.[def.name] ??
+        def.requiresApproval ??
+        false,
       execute: async (_toolCallId, params) => {
         const context: ToolContext | undefined = def.needsContext
           ? { chatId: opts?.chatId }
@@ -286,3 +293,4 @@ export {
   withTimeout,
   TOOL_TIMEOUT_MS,
 };
+export type { ExtendedAgentTool };

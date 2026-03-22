@@ -246,6 +246,7 @@ const driveToolDefs: ToolRegistration[] = [
     description:
       'Create a new file in Google Drive. Requires name and content. Optional mimeType and folderId.',
     schema: driveCreateSchema,
+    requiresApproval: true,
     execute: args => executeDriveCreate(args as DriveCreateArgs),
     formatResult: jsonFormatResult,
   },

@@ -24,9 +24,11 @@ type PreviewMessageProps = {
   isLoading: boolean;
   setMessages?: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   onEditSubmit?: (messageId: string, content: string) => void;
+  onApprove?: (toolCallId: string) => void;
+  onDeny?: (toolCallId: string, reason: string) => void;
 };
 
-const PreviewMessage = ({ message, isLoading, setMessages, onEditSubmit }: PreviewMessageProps) => {
+const PreviewMessage = ({ message, isLoading, setMessages, onEditSubmit, onApprove, onDeny }: PreviewMessageProps) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
 
   const textContent = useMemo(
@@ -201,6 +203,9 @@ const PreviewMessage = ({ message, isLoading, setMessages, onEditSubmit }: Previ
                 <ToolCallPart
                   args={part.args}
                   key={part.toolCallId}
+                  matchedRule={part.matchedRule}
+                  onApprove={onApprove}
+                  onDeny={onDeny}
                   part={part}
                   result={part.result}
                   state={state}
@@ -236,15 +241,53 @@ type ToolCallPartProps = {
   toolName: string;
   args: Record<string, unknown>;
   result: unknown;
+  matchedRule?: { name: string; message?: string };
+  onApprove?: (toolCallId: string) => void;
+  onDeny?: (toolCallId: string, reason: string) => void;
 };
 
-const ToolCallPart = ({ part, state, toolName, args, result }: ToolCallPartProps) => (
+const ToolCallPart = ({ part, state, toolName, args, result, matchedRule, onApprove, onDeny }: ToolCallPartProps) => (
   <div className="w-full" key={part.toolCallId}>
     <Tool className="w-full" defaultOpen={true}>
       <ToolHeader name={toolName} state={state} />
       <ToolContent>
-        {(state === 'input-available' || state === 'output-available' || state === 'output-error') && (
+        {(state === 'input-available' || state === 'pending-approval' || state === 'output-available' || state === 'output-error') && (
           <ToolInput input={args} />
+        )}
+
+        {state === 'pending-approval' && (
+          <div className="flex flex-col gap-2 border-t px-4 py-3">
+            {matchedRule ? (
+              <div className="rounded-md bg-yellow-50 px-3 py-2 dark:bg-yellow-950/30">
+                <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                  触发规则：{matchedRule.name}
+                </p>
+                {matchedRule.message && (
+                  <p className="mt-0.5 text-xs text-yellow-600 dark:text-yellow-500">
+                    {matchedRule.message}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                此工具调用需要您的确认才能执行。
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                className="rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-muted"
+                onClick={() => onDeny?.(part.toolCallId, '')}
+                type="button">
+                拒绝
+              </button>
+              <button
+                className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm transition-colors hover:opacity-90"
+                onClick={() => onApprove?.(part.toolCallId)}
+                type="button">
+                同意执行
+              </button>
+            </div>
+          </div>
         )}
 
         {state === 'output-available' && result != null ? (

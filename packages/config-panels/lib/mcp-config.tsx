@@ -206,6 +206,8 @@ interface ServerFormData {
   apiKey: string;
   enabled: boolean;
   transport: Transport;
+  requireApproval: boolean;
+  toolApprovalOverrides: Record<string, boolean>;
 }
 
 const emptyForm: ServerFormData = {
@@ -214,6 +216,8 @@ const emptyForm: ServerFormData = {
   apiKey: '',
   enabled: true,
   transport: 'auto',
+  requireApproval: false,
+  toolApprovalOverrides: {},
 };
 
 const ServerDialog = ({
@@ -235,6 +239,8 @@ const ServerDialog = ({
           apiKey: initial.apiKey ?? '',
           enabled: initial.enabled,
           transport: (initial.transport ?? 'auto') as Transport,
+          requireApproval: initial.requireApproval ?? false,
+          toolApprovalOverrides: initial.toolApprovalOverrides ?? {},
         }
       : emptyForm,
   );
@@ -252,6 +258,8 @@ const ServerDialog = ({
               apiKey: initial.apiKey ?? '',
               enabled: initial.enabled,
               transport: (initial.transport ?? 'auto') as Transport,
+              requireApproval: initial.requireApproval ?? false,
+              toolApprovalOverrides: initial.toolApprovalOverrides ?? {},
             }
           : emptyForm,
       );
@@ -290,7 +298,6 @@ const ServerDialog = ({
     try { new URL(form.url.trim()); } catch { setError('Invalid URL'); return; }
     onSave({ ...form, url: form.url.trim(), id: initial?.id });
   };
-
   return (
     <Dialog onOpenChange={o => !o && onClose()} open={open}>
       <DialogContent className="max-w-lg">
@@ -357,20 +364,69 @@ const ServerDialog = ({
 
           {testStatus === 'ok' && (
             <div className="bg-accent/50 text-accent-foreground rounded-md border p-3">
-              <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <CheckCircleIcon className="text-primary size-4" />
                 Connected — {testTools.length} tool{testTools.length !== 1 ? 's' : ''} available
               </div>
+
+              {/* Server-level default approval toggle */}
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">All tools require approval (default)</span>
+                <input
+                  checked={form.requireApproval}
+                  className="accent-yellow-500 size-4 cursor-pointer"
+                  onChange={e => setForm(prev => ({ ...prev, requireApproval: e.target.checked }))}
+                  type="checkbox"
+                />
+              </div>
+
+              {/* Per-tool overrides */}
               {testTools.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {testTools.slice(0, 12).map(t => (
-                    <Badge className="font-mono text-xs" key={t.name} variant="secondary">
-                      {t.name}
-                    </Badge>
-                  ))}
-                  {testTools.length > 12 && (
-                    <Badge variant="secondary">+{testTools.length - 12} more</Badge>
-                  )}
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {testTools.map(t => {
+                    const override = form.toolApprovalOverrides[t.name];
+                    const effective = override ?? form.requireApproval;
+                    return (
+                      <div key={t.name} className="flex items-center justify-between gap-2">
+                        <Badge className="font-mono text-xs" variant="secondary">
+                          {t.name}
+                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <input
+                            checked={effective}
+                            className="accent-yellow-500 size-3.5 cursor-pointer"
+                            onChange={e => {
+                              const val = e.target.checked;
+                              setForm(prev => ({
+                                ...prev,
+                                toolApprovalOverrides: {
+                                  ...prev.toolApprovalOverrides,
+                                  [t.name]: val,
+                                },
+                              }));
+                            }}
+                            title={override !== undefined ? 'Override' : 'Inherits server default'}
+                            type="checkbox"
+                          />
+                          {override !== undefined && (
+                            <button
+                              className="text-muted-foreground hover:text-foreground text-xs underline"
+                              onClick={() => {
+                                setForm(prev => {
+                                  const overrides = { ...prev.toolApprovalOverrides };
+                                  delete overrides[t.name];
+                                  return { ...prev, toolApprovalOverrides: overrides };
+                                });
+                              }}
+                              title="Reset to server default"
+                              type="button">
+                              ↺
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -437,20 +493,25 @@ const McpConfig = () => {
     apiKey: string;
     enabled: boolean;
     transport: Transport;
+    requireApproval: boolean;
+    toolApprovalOverrides: Record<string, boolean>;
   }) => {
     const transport = data.transport === 'auto' ? undefined : data.transport;
+    const requireApproval = data.requireApproval || undefined;
+    const toolApprovalOverrides =
+      Object.keys(data.toolApprovalOverrides).length > 0 ? data.toolApprovalOverrides : undefined;
     if (data.id) {
       await persist(
         servers.map(s =>
           s.id === data.id
-            ? { ...s, name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport }
+            ? { ...s, name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides }
             : s,
         ),
       );
     } else {
       await persist([
         ...servers,
-        { id: nanoid(), name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport },
+        { id: nanoid(), name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides },
       ]);
     }
     setDialogOpen(false);

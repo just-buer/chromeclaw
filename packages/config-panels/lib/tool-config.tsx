@@ -399,6 +399,18 @@ const ToolConfig = () => {
     });
   }, []);
 
+  const handleApprovalToggle = useCallback((toolName: string, value: boolean) => {
+    setConfig(prev => {
+      if (!prev) return null;
+      const next: ToolConfigData = {
+        ...prev,
+        requireApprovalTools: { ...(prev.requireApprovalTools ?? {}), [toolName]: value },
+      };
+      toolConfigStorage.set(next);
+      return next;
+    });
+  }, []);
+
   const handleProviderChange = useCallback((provider: WebSearchProvider) => {
     setConfig(prev => {
       if (!prev) return null;
@@ -516,6 +528,9 @@ const ToolConfig = () => {
                     {/* Per-tool checkboxes */}
                     {group.tools.map(tool => {
                       const checkboxId = `tool-${tool.name}`;
+                      const approvalId = `tool-approval-${tool.name}`;
+                      const isEnabled = config.enabledTools[tool.name] ?? tool.defaultEnabled;
+                      const requiresApproval = config.requireApprovalTools?.[tool.name] ?? false;
                       return (
                         <div key={tool.name} className="flex items-center justify-between pl-8">
                           <div>
@@ -524,13 +539,36 @@ const ToolConfig = () => {
                             </Label>
                             <p className="text-muted-foreground text-xs">{tool.description}</p>
                           </div>
-                          <input
-                            checked={config.enabledTools[tool.name] ?? tool.defaultEnabled}
-                            className="accent-primary size-4"
-                            id={checkboxId}
-                            onChange={e => handleToggle(tool.name, e.target.checked)}
-                            type="checkbox"
-                          />
+                          <div className="flex items-center gap-3">
+                            {isEnabled && (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    checked={requiresApproval}
+                                    className="accent-yellow-500 size-3.5 cursor-pointer"
+                                    id={approvalId}
+                                    onChange={e => handleApprovalToggle(tool.name, e.target.checked)}
+                                    title="Require approval before executing"
+                                    type="checkbox"
+                                  />
+                                  <Label className="text-muted-foreground cursor-pointer text-xs" htmlFor={approvalId}>
+                                    审批
+                                  </Label>
+                                </div>
+                                <Separator className="h-4" orientation="vertical" />
+                              </>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <input
+                                checked={isEnabled}
+                                className="accent-primary size-4"
+                                id={checkboxId}
+                                onChange={e => handleToggle(tool.name, e.target.checked)}
+                                type="checkbox"
+                              />
+                              <span className="text-muted-foreground text-xs">启用</span>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -585,6 +623,9 @@ const ToolConfig = () => {
                       </div>
                       {group.tools.map(tool => {
                         const checkboxId = `tool-${tool.name}`;
+                        const approvalId = `tool-approval-${tool.name}`;
+                        const isEnabled = config.enabledTools[tool.name] ?? tool.defaultEnabled;
+                        const requiresApproval = config.requireApprovalTools?.[tool.name] ?? false;
                         return (
                           <div
                             key={tool.name}
@@ -595,14 +636,37 @@ const ToolConfig = () => {
                               </Label>
                               <p className="text-muted-foreground text-xs">{tool.description}</p>
                             </div>
-                            <input
-                              checked={config.enabledTools[tool.name] ?? tool.defaultEnabled}
-                              className={`accent-primary size-4${!isGoogleConnected ? ' pointer-events-none' : ''}`}
-                              disabled={!isGoogleConnected}
-                              id={checkboxId}
-                              onChange={e => handleToggle(tool.name, e.target.checked)}
-                              type="checkbox"
-                            />
+                            <div className="flex items-center gap-3">
+                              {isEnabled && isGoogleConnected && (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      checked={requiresApproval}
+                                      className="accent-yellow-500 size-3.5 cursor-pointer"
+                                      id={approvalId}
+                                      onChange={e => handleApprovalToggle(tool.name, e.target.checked)}
+                                      title="Require approval before executing"
+                                      type="checkbox"
+                                    />
+                                    <Label className="text-muted-foreground cursor-pointer text-xs" htmlFor={approvalId}>
+                                      审批
+                                    </Label>
+                                  </div>
+                                  <Separator className="h-4" orientation="vertical" />
+                                </>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <input
+                                  checked={isEnabled}
+                                  className={`accent-primary size-4${!isGoogleConnected ? ' pointer-events-none' : ''}`}
+                                  disabled={!isGoogleConnected}
+                                  id={checkboxId}
+                                  onChange={e => handleToggle(tool.name, e.target.checked)}
+                                  type="checkbox"
+                                />
+                                <span className="text-muted-foreground text-xs">启用</span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}

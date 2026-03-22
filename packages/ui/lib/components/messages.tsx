@@ -47,6 +47,8 @@ type MessagesProps = {
   onSendMessage?: (content: string) => void;
   activeSubagents?: SubagentProgressInfo[];
   onStopSubagent?: (runId: string) => void;
+  onApprove?: (toolCallId: string) => void;
+  onDeny?: (toolCallId: string, reason: string) => void;
 };
 
 const Messages = ({
@@ -57,6 +59,8 @@ const Messages = ({
   onSendMessage,
   activeSubagents,
   onStopSubagent,
+  onApprove,
+  onDeny,
 }: MessagesProps) => {
   const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
@@ -104,6 +108,8 @@ const Messages = ({
                 isLoading={status === 'streaming' && messages.length - 1 === index}
                 key={message.id}
                 message={message}
+                onApprove={onApprove}
+                onDeny={onDeny}
                 onEditSubmit={onEditSubmit}
                 setMessages={setMessages}
               />

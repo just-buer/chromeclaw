@@ -4,7 +4,8 @@ import { sanitizeHistory } from '../context/history-sanitization';
 import { createTransformContext } from '../context/transform';
 import { createLogger } from '../logging/logger-buffer';
 import { runMemoryFlushIfNeeded } from '../memory/memory-flush';
-import { activeAgentStorage, saveArtifact } from '@extension/storage';
+import { activeAgentStorage, approvalRulesStorage, saveArtifact } from '@extension/storage';
+import { evaluateApprovalRules } from '../tools/approval-rules-evaluator';
 import type { chatModelToPiModel } from './model-adapter';
 import type {
   ChatMessagePart,
@@ -15,12 +16,30 @@ import type {
   LLMStreamError,
   LLMStreamRetry,
   LLMTtsAudio,
+  LLMToolApprovalRequest,
+  LLMToolApprovalResponse,
   ModelProvider,
 } from '@extension/shared';
-import type { DbArtifact } from '@extension/storage';
+import type { ApprovalRule, DbArtifact } from '@extension/storage';
 import type { AssistantMessage } from '@mariozechner/pi-ai';
 
 const streamLog = createLogger('stream');
+
+/**
+ * Active approval resolver functions, keyed by chatId.
+ * Used by background/index.ts to forward LLM_TOOL_APPROVAL_RESPONSE messages
+ * to the correct stream handler.
+ */
+const activeApprovalResolvers = new Map<
+  string,
+  (response: LLMToolApprovalResponse) => void
+>();
+
+/** Called from background/index.ts when a LLM_TOOL_APPROVAL_RESPONSE arrives on any port. */
+const handleApprovalResponse = (response: LLMToolApprovalResponse & { chatId: string }): void => {
+  const resolver = activeApprovalResolvers.get(response.chatId);
+  if (resolver) resolver(response);
+};
 
 /** Post a message to the port, returning false if the port is disconnected. */
 const safeSend = (port: chrome.runtime.Port, msg: Record<string, unknown>): boolean => {
@@ -102,6 +121,72 @@ const handleLLMStream = async (
 ): Promise<void> => {
   const { chatId, messages, model: modelConfig, assistantMessageId } = request;
   const assistantParts: ChatMessagePart[] = [];
+
+  // Pending approval promises keyed by toolCallId, also carries the matched rule for context
+  const pendingApprovals = new Map<
+    string,
+    (decision: { approved: boolean; denyReason?: string }) => void
+  >();
+  // Matched dynamic rule per toolCallId, used to populate LLMToolApprovalRequest
+  const pendingMatchedRules = new Map<string, { name: string; message?: string }>();
+
+  // Load dynamic approval rules once for this stream session
+  const approvalRules: ApprovalRule[] = (await approvalRulesStorage.get()) ?? [];
+
+  /** Called by agent-loop for every tool call to check dynamic rules. */
+  const onShouldApprove = async (
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<boolean> => {
+    if (approvalRules.length === 0) return false;
+    const matched = evaluateApprovalRules(toolName, args, approvalRules);
+    return matched !== null;
+  };
+
+  /** Called by agent-loop when a tool with requiresApproval=true is about to execute. */
+  const onApprovalRequest = async (
+    toolCallId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<{ approved: boolean; denyReason?: string }> => {
+    // Check if a dynamic rule matched (may have been pre-evaluated by onShouldApprove)
+    const matchedRule =
+      pendingMatchedRules.get(toolCallId) ??
+      (() => {
+        const r = evaluateApprovalRules(toolName, args, approvalRules);
+        return r ? { name: r.name, message: r.message } : undefined;
+      })();
+
+    // Update the tool-call part state to pending-approval
+    sendChunk(port, { chatId, toolCall: { id: toolCallId, name: toolName, args }, state: 'pending-approval' });
+
+    // Send the explicit approval request message
+    safeSend(port, {
+      type: 'LLM_TOOL_APPROVAL_REQUEST',
+      chatId,
+      toolCallId,
+      toolName,
+      args,
+      matchedRule,
+    } satisfies LLMToolApprovalRequest);
+
+    // Wait for the UI to respond
+    return new Promise(resolve => {
+      pendingApprovals.set(toolCallId, resolve);
+    });
+  };
+
+  /** Resolve a pending approval from the UI. Called by background/index.ts. */
+  const resolveApproval = (response: LLMToolApprovalResponse) => {
+    const resolve = pendingApprovals.get(response.toolCallId);
+    if (resolve) {
+      pendingApprovals.delete(response.toolCallId);
+      resolve({ approved: response.approved, denyReason: response.denyReason });
+    }
+  };
+
+  // Register the resolver so index.ts can forward UI responses
+  activeApprovalResolvers.set(chatId, resolveApproval);
 
   streamLog.info('Stream started', { chatId, model: modelConfig.id });
   streamLog.trace('Stream request detail', {
@@ -194,6 +279,8 @@ const handleLLMStream = async (
       transformContext: notifyingTransformContext,
       chatId,
       onProviderLimitDetected: setProviderLimit,
+      onApprovalRequest,
+      onShouldApprove,
       onRetry: info => {
         // Reset accumulated parts on retry — the stream restarts fresh
         assistantParts.length = 0;
@@ -404,6 +491,10 @@ const handleLLMStream = async (
     // Await any pending TTS + sendEnd from the onAgentEnd handler
     if (ttsEndPromise) await ttsEndPromise;
 
+    // Clean up approval resolver and rule cache
+    activeApprovalResolvers.delete(chatId);
+    pendingMatchedRules.clear();
+
     // Persist the assistant message from the background SW so it survives
     // agent switches / extension reloads that may kill the frontend callback chain.
     if (assistantParts.length > 0 && assistantMessageId) {
@@ -430,6 +521,10 @@ const handleLLMStream = async (
     streamLog.error('Stream error', { chatId, error: errorMsg });
     sendError(port, chatId, errorMsg);
 
+    // Clean up approval resolver on error
+    activeApprovalResolvers.delete(chatId);
+    pendingMatchedRules.clear();
+
     // Persist partial assistant message on error so it's not lost on reload
     if (assistantParts.length > 0 && assistantMessageId) {
       try {
@@ -450,4 +545,4 @@ const handleLLMStream = async (
   }
 };
 
-export { handleLLMStream };
+export { handleLLMStream, handleApprovalResponse };
