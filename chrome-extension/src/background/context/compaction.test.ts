@@ -291,8 +291,8 @@ describe('getEffectiveContextLimit', () => {
     expect(getEffectiveContextLimit('gpt-4o')).toBe(Math.floor(128_000 * CONTEXT_RATIO));
   });
 
-  it('returns known limit for claude-sonnet-4-5-20250929 (200K * 0.75)', () => {
-    expect(getEffectiveContextLimit('claude-sonnet-4-5-20250929')).toBe(
+  it('returns known limit for claude-sonnet-4-5 (200K * 0.75)', () => {
+    expect(getEffectiveContextLimit('claude-sonnet-4-5')).toBe(
       Math.floor(200_000 * CONTEXT_RATIO),
     );
   });
@@ -743,10 +743,10 @@ describe('getEffectiveContextLimit — model ID normalization', () => {
     expect(withDot).toBe(Math.floor(200_000 * CONTEXT_RATIO));
   });
 
-  it('resolves claude-sonnet-4.5 same as claude-sonnet-4-5-20250929', () => {
-    const known = getEffectiveContextLimit('claude-sonnet-4-5-20250929');
+  it('resolves claude-sonnet-4.5 same as claude-sonnet-4-5', () => {
+    const known = getEffectiveContextLimit('claude-sonnet-4-5');
     // A dot-variant should also resolve correctly
-    const dotVariant = getEffectiveContextLimit('claude-sonnet-4.5-20250929');
+    const dotVariant = getEffectiveContextLimit('claude-sonnet-4.5');
     expect(dotVariant).toBe(known);
   });
 

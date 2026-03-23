@@ -1084,6 +1084,17 @@ const handleNetwork = async (args: BrowserArgs): Promise<string> => {
 // ---------------------------------------------------------------------------
 
 const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotResult> => {
+  // Coerce tabId/ref to numbers — LLMs sometimes emit string values and the
+  // browser extension CSP prevents AJV type coercion from running.
+  if (args.tabId != null && typeof args.tabId !== 'number') {
+    (args as Record<string, unknown>).tabId = Number(args.tabId);
+    if (Number.isNaN(args.tabId)) (args as Record<string, unknown>).tabId = undefined;
+  }
+  if (args.ref != null && typeof args.ref !== 'number') {
+    (args as Record<string, unknown>).ref = Number(args.ref);
+    if (Number.isNaN(args.ref)) (args as Record<string, unknown>).ref = undefined;
+  }
+
   // Firefox: delegate to scripting-based implementation (no chrome.debugger)
   if (IS_FIREFOX) {
     const { executeBrowserFirefox } = await import('./browser-firefox');

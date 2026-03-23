@@ -6,6 +6,7 @@
  */
 
 import type { BrowserArgs, ScreenshotResult } from './browser';
+import { sanitizeImage } from './image-sanitization';
 
 // The `browser` global is provided by webextension-polyfill (imported in index.ts)
 // or natively by Firefox. We declare it loosely here since @types/webextension-polyfill
@@ -298,6 +299,152 @@ const handleSnapshot = async (args: BrowserArgs): Promise<string> => {
   return results?.[0]?.result ?? 'Error: Failed to capture snapshot';
 };
 
+// ---------------------------------------------------------------------------
+// SYNC WARNING: The isInteractive / INTERACTIVE_TAGS / INTERACTIVE_ROLES /
+// SKIP_TAGS logic is intentionally duplicated in handleSnapshot, handleClick,
+// and handleType because chrome.scripting.executeScript requires self-contained
+// functions. Any change to the interactive element detection MUST be applied
+// to all three handlers to keep ref numbering consistent.
+// ---------------------------------------------------------------------------
+
+const handleClick = async (args: BrowserArgs): Promise<string> => {
+  if (args.tabId == null) return 'Error: "tabId" is required for the "click" action.';
+  if (args.ref == null) return 'Error: "ref" is required for the "click" action.';
+
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: args.tabId },
+    func: (targetRef: number) => {
+      // Inline the interactive element finder (must be self-contained for executeScript)
+      const INTERACTIVE_TAGS = new Set([
+        'a', 'button', 'input', 'select', 'textarea', 'details', 'summary',
+      ]);
+      const INTERACTIVE_ROLES = new Set([
+        'button', 'link', 'checkbox', 'radio', 'tab', 'menuitem', 'switch',
+        'combobox', 'searchbox', 'slider', 'spinbutton', 'textbox', 'option',
+      ]);
+      const SKIP_TAGS = new Set([
+        'script', 'style', 'noscript', 'svg', 'meta', 'link', 'path', 'defs', 'clippath',
+      ]);
+
+      const isInteractive = (el: Element): boolean => {
+        const tag = el.tagName.toLowerCase();
+        if (INTERACTIVE_TAGS.has(tag)) return true;
+        const role = el.getAttribute('role');
+        if (role && INTERACTIVE_ROLES.has(role)) return true;
+        if (el.hasAttribute('onclick')) return true;
+        if (el.getAttribute('contenteditable') === 'true') return true;
+        if (el.hasAttribute('tabindex') && tag !== 'div' && tag !== 'span') return true;
+        return false;
+      };
+
+      let refCounter = 0;
+      const walk = (node: Node): Element | null => {
+        if (node.nodeType !== 1) return null;
+        const el = node as Element;
+        const tag = el.tagName.toLowerCase();
+        if (SKIP_TAGS.has(tag)) return null;
+        if (isInteractive(el)) {
+          refCounter++;
+          if (refCounter === targetRef) return el;
+          return null;
+        }
+        for (const child of el.childNodes) {
+          const found = walk(child);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      const el = walk(document.body);
+      if (!el) return `Error: Ref [${targetRef}] not found. Run "snapshot" to refresh refs.`;
+
+      (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'instant' });
+      (el as HTMLElement).click();
+      const tag = el.tagName.toLowerCase();
+      const text = (el.textContent ?? '').trim().slice(0, 50);
+      return `Clicked element [${targetRef}] <${tag}>${text ? ` "${text}"` : ''}.`;
+    },
+    args: [args.ref],
+  });
+
+  return results?.[0]?.result ?? 'Error: Failed to execute click.';
+};
+
+const handleType = async (args: BrowserArgs): Promise<string> => {
+  if (args.tabId == null) return 'Error: "tabId" is required for the "type" action.';
+  if (args.ref == null) return 'Error: "ref" is required for the "type" action.';
+  if (!args.text) return 'Error: "text" is required for the "type" action.';
+
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: args.tabId },
+    func: (targetRef: number, text: string) => {
+      // Inline the interactive element finder (must be self-contained for executeScript)
+      const INTERACTIVE_TAGS = new Set([
+        'a', 'button', 'input', 'select', 'textarea', 'details', 'summary',
+      ]);
+      const INTERACTIVE_ROLES = new Set([
+        'button', 'link', 'checkbox', 'radio', 'tab', 'menuitem', 'switch',
+        'combobox', 'searchbox', 'slider', 'spinbutton', 'textbox', 'option',
+      ]);
+      const SKIP_TAGS = new Set([
+        'script', 'style', 'noscript', 'svg', 'meta', 'link', 'path', 'defs', 'clippath',
+      ]);
+
+      const isInteractive = (el: Element): boolean => {
+        const tag = el.tagName.toLowerCase();
+        if (INTERACTIVE_TAGS.has(tag)) return true;
+        const role = el.getAttribute('role');
+        if (role && INTERACTIVE_ROLES.has(role)) return true;
+        if (el.hasAttribute('onclick')) return true;
+        if (el.getAttribute('contenteditable') === 'true') return true;
+        if (el.hasAttribute('tabindex') && tag !== 'div' && tag !== 'span') return true;
+        return false;
+      };
+
+      let refCounter = 0;
+      const walk = (node: Node): Element | null => {
+        if (node.nodeType !== 1) return null;
+        const el = node as Element;
+        const tag = el.tagName.toLowerCase();
+        if (SKIP_TAGS.has(tag)) return null;
+        if (isInteractive(el)) {
+          refCounter++;
+          if (refCounter === targetRef) return el;
+          return null;
+        }
+        for (const child of el.childNodes) {
+          const found = walk(child);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      const el = walk(document.body);
+      if (!el) return `Error: Ref [${targetRef}] not found. Run "snapshot" to refresh refs.`;
+
+      const htmlEl = el as HTMLElement;
+      htmlEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+      htmlEl.focus();
+
+      // Set value and dispatch events for framework compatibility
+      if ('value' in htmlEl) {
+        (htmlEl as HTMLInputElement).value = text;
+        htmlEl.dispatchEvent(new Event('input', { bubbles: true }));
+        htmlEl.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (htmlEl.getAttribute('contenteditable') === 'true') {
+        htmlEl.textContent = text;
+        htmlEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      const preview = text.length > 50 ? text.slice(0, 50) + '...' : text;
+      return `Typed "${preview}" into element [${targetRef}].`;
+    },
+    args: [args.ref, args.text],
+  });
+
+  return results?.[0]?.result ?? 'Error: Failed to execute type.';
+};
+
 const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotResult> => {
   if (args.tabId == null) return 'Error: "tabId" is required for the "screenshot" action.';
 
@@ -324,6 +471,24 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
 
   // Strip data URL prefix to get base64
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+
+  // Resize, compress, and get real dimensions (matches Chrome behavior)
+  let sanitized;
+  try {
+    sanitized = await sanitizeImage(base64, 'image/png');
+  } catch {
+    // Fallback: return raw PNG if sanitization fails (e.g. OffscreenCanvas unavailable)
+  }
+
+  if (sanitized) {
+    return {
+      __type: 'screenshot',
+      base64: sanitized.base64,
+      mimeType: sanitized.mimeType,
+      width: sanitized.width,
+      height: sanitized.height,
+    };
+  }
 
   return {
     __type: 'screenshot',
@@ -364,6 +529,17 @@ const handleEvaluate = async (args: BrowserArgs): Promise<string> => {
 // ---------------------------------------------------------------------------
 
 const executeBrowserFirefox = async (args: BrowserArgs): Promise<string | ScreenshotResult> => {
+  // Coerce tabId/ref to numbers — LLMs sometimes emit string values and the
+  // browser extension CSP prevents AJV type coercion from running.
+  if (args.tabId != null && typeof args.tabId !== 'number') {
+    (args as Record<string, unknown>).tabId = Number(args.tabId);
+    if (Number.isNaN(args.tabId)) (args as Record<string, unknown>).tabId = undefined;
+  }
+  if (args.ref != null && typeof args.ref !== 'number') {
+    (args as Record<string, unknown>).ref = Number(args.ref);
+    if (Number.isNaN(args.ref)) (args as Record<string, unknown>).ref = undefined;
+  }
+
   try {
     switch (args.action) {
       case 'tabs':
@@ -385,9 +561,9 @@ const executeBrowserFirefox = async (args: BrowserArgs): Promise<string | Screen
       case 'evaluate':
         return await handleEvaluate(args);
       case 'click':
-        return 'Click by ref is not available on Firefox. Use evaluate with document.querySelector("selector").click() instead.';
+        return await handleClick(args);
       case 'type':
-        return 'Type by ref is not available on Firefox. Use evaluate with querySelector + value assignment instead.';
+        return await handleType(args);
       case 'console':
         return 'Console monitoring is unavailable on Firefox. The debugger API is not supported.';
       case 'network':

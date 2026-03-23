@@ -59,6 +59,8 @@ const setConversationId = (key: string, id: string): void => {
   conversationIdCache.set(key, id);
 };
 
+const clearConversationId = (key: string): boolean => conversationIdCache.delete(key);
+
 // ── Default Strategy ─────────────────────────────
 // Default strategy — delegates to existing XML tool prompt.
 
@@ -222,6 +224,23 @@ const glmToolStrategy: WebProviderToolStrategy = {
   serializeAssistantContent,
 };
 
+// ── GLM International Strategy ──────────────────
+// chat.z.ai is stateful — the MAIN world handler injects a synthetic
+// `{"type":"glm:chat_id","chat_id":"..."}` SSE event at the start of
+// each stream so the bridge can cache and reuse the chat_id.
+
+const glmIntlToolStrategy: WebProviderToolStrategy = {
+  buildToolPrompt: buildMarkdownToolPrompt,
+  buildPrompt: buildStatefulPrompt,
+
+  extractConversationId: data => {
+    const obj = data as Record<string, unknown>;
+    return obj.chat_id as string | undefined;
+  },
+
+  serializeAssistantContent,
+};
+
 // ── Gemini Strategy ────────────────────────────
 // Gemini's web API is stateless from our perspective (no server-side conversation ID reuse).
 // Always aggregates full history into a single user message (like Kimi/Claude).
@@ -274,8 +293,9 @@ const getToolStrategy = (providerId: WebProviderId): WebProviderToolStrategy => 
     case 'gemini-web':
       return geminiToolStrategy;
     case 'glm-web':
-    case 'glm-intl-web':
       return glmToolStrategy;
+    case 'glm-intl-web':
+      return glmIntlToolStrategy;
     default:
       return defaultToolStrategy;
   }
@@ -285,11 +305,13 @@ export {
   getToolStrategy,
   getConversationId,
   setConversationId,
+  clearConversationId,
   defaultToolStrategy,
   claudeToolStrategy,
   qwenToolStrategy,
   kimiToolStrategy,
   glmToolStrategy,
+  glmIntlToolStrategy,
   geminiToolStrategy,
 };
 export type { WebProviderToolStrategy, SimpleMessage, ContentPart };

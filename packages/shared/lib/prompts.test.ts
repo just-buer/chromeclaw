@@ -165,10 +165,10 @@ describe('buildSystemPrompt', () => {
   it('includes runtime metadata (model name, date)', () => {
     const result = buildSystemPrompt({
       mode: 'full',
-      runtimeMeta: { modelName: 'claude-sonnet-4-5-20250929', currentDate: '2026-01-15' },
+      runtimeMeta: { modelName: 'claude-sonnet-4-5', currentDate: '2026-01-15' },
     });
     expect(result.text).toContain('Current date: 2026-01-15');
-    expect(result.text).toContain('Model: claude-sonnet-4-5-20250929');
+    expect(result.text).toContain('Model: claude-sonnet-4-5');
   });
 
   it('skips runtime metadata when not provided', () => {

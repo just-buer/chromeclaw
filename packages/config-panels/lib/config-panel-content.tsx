@@ -17,6 +17,7 @@ import { WhatsAppConfig } from './whatsapp-config';
 import { McpConfig } from './mcp-config';
 import { ApprovalRulesConfig } from './approval-rules-config';
 
+
 const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTabId; onOpenSession?: (chatId: string) => void }) => (
   <>
     {activeTab === 'general' && <Settings />}

@@ -20,7 +20,7 @@ const THINK_OPEN_RE = /<think>/i;
 const THINK_CLOSE_RE = /<\/think>/i;
 const TOOL_CALL_OPEN_START_RE = /^<tool_call(?:\s[^>]*)?>/i;
 const TOOL_CALL_OPEN_RE = /<tool_call(?:\s[^>]*)?>/i;
-const TOOL_CALL_CLOSE_RE = /<\/tool_call>/i;
+const TOOL_CALL_CLOSE_RE = /<\/tool_call\s*>/i;
 const TOOL_CALL_PREFIX_RE = /^<tool_call/i;
 /** Matches hallucinated tool_response tags — these are fake and should be discarded. */
 const TOOL_RESPONSE_OPEN_RE = /<tool_response(?:\s[^>]*)?>/i;
@@ -226,10 +226,11 @@ const createXmlTagParser = (): {
         // Search in the combined toolCallBuffer + buffer so that a closing tag
         // split across feed() calls (e.g. "\n</" then "tool_call>") is detected.
         const combined = toolCallBuffer + buffer;
-        const end = combined.search(TOOL_CALL_CLOSE_RE);
-        if (end >= 0) {
+        const closeMatch = combined.match(TOOL_CALL_CLOSE_RE);
+        if (closeMatch) {
+          const end = combined.indexOf(closeMatch[0]);
           const body = combined.slice(0, end);
-          const rest = combined.slice(end + 12); // len('</tool_call>') — always 12 regardless of case
+          const rest = combined.slice(end + closeMatch[0].length);
 
           const event = parseToolCallJson(body);
           if (event.type === 'tool_call' && toolCallAttrs) {

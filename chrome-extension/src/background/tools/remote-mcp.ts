@@ -368,6 +368,7 @@ export async function getRemoteMcpAgentTools(): Promise<AgentTool[]> {
             server.toolApprovalOverrides?.[tool.name] ??
             server.requireApproval ??
             false,
+
           execute: async (_toolCallId, params) => {
             try {
               const t = (server.transport ?? 'auto') as McpTransport;

@@ -558,6 +558,57 @@ describe('createXmlTagParser', () => {
     ]);
   });
 
+  it('handles closing tag with space before > (GLM-Intl quirk)', () => {
+    const parser = createXmlTagParser();
+    const events = parser.feed(
+      '<tool_call id="abc" name="web_search">{"query":"test"}</tool_call >',
+    );
+    expect(events).toEqual([
+      {
+        type: 'tool_call',
+        id: 'abc',
+        name: 'web_search',
+        arguments: { query: 'test' },
+      },
+    ]);
+  });
+
+  it('handles closing tag with multiple spaces before >', () => {
+    const parser = createXmlTagParser();
+    const events = parser.feed(
+      '<tool_call id="abc" name="web_search">{"query":"test"}</tool_call  >',
+    );
+    expect(events).toEqual([
+      {
+        type: 'tool_call',
+        id: 'abc',
+        name: 'web_search',
+        arguments: { query: 'test' },
+      },
+    ]);
+  });
+
+  it('handles closing tag with space split across feed() calls (GLM-Intl streaming)', () => {
+    const parser = createXmlTagParser();
+
+    parser.feed('<tool_call id="extract_wu" name="web_fetch">');
+    parser.feed('{"url": "https://example.com"}');
+
+    // GLM-Intl splits: "</" in one chunk, "tool_call >" in next
+    const e1 = parser.feed('</');
+    expect(e1).toEqual([]);
+
+    const e2 = parser.feed('tool_call >');
+    expect(e2).toEqual([
+      {
+        type: 'tool_call',
+        id: 'extract_wu',
+        name: 'web_fetch',
+        arguments: { url: 'https://example.com' },
+      },
+    ]);
+  });
+
   it('returns tool_call_malformed for double-wrapped with invalid inner JSON', () => {
     const parser = createXmlTagParser();
     const events = parser.feed(

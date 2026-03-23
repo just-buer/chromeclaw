@@ -76,7 +76,7 @@ interface DbWorkspaceFile {
 /** DB-level model config */
 interface DbChatModel {
   id: string;
-  /** The model identifier sent to the provider (e.g. gpt-4o, claude-sonnet-4-5-20250929) */
+  /** The model identifier sent to the provider (e.g. gpt-4o, claude-sonnet-4-5) */
   modelId: string;
   name: string;
   provider: string;

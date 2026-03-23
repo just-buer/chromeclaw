@@ -103,6 +103,35 @@ describe('createGlmStreamAdapter', () => {
       expect(matches).toHaveLength(2);
     });
 
+    it("normalizes </call'> (truncated tag name) to </tool_call>", () => {
+      const adapter = createGlmStreamAdapter();
+      const text = '<tool_call id="a1" name="web_fetch">{"url": "https://example.com"}</call\'>';
+      const result = adapter.processEvent({ parsed: textEvent(text), delta: text });
+      expect(result!.feedText).toContain('</tool_call>');
+      expect(result!.feedText).not.toContain("</call'>");
+    });
+
+    it("normalizes </call'>; with trailing semicolon", () => {
+      const adapter = createGlmStreamAdapter();
+      const text = '<tool_call id="a1" name="web_fetch">{"url": "https://example.com"}</call\'>;';
+      const result = adapter.processEvent({ parsed: textEvent(text), delta: text });
+      expect(result!.feedText).toContain('</tool_call>');
+      expect(result!.feedText).not.toContain("</call'>");
+      // Semicolon remains as harmless trailing text
+      expect(result!.feedText).toContain('</tool_call>;');
+    });
+
+    it("normalizes multiple truncated </call'> closing tags", () => {
+      const adapter = createGlmStreamAdapter();
+      const text =
+        '<tool_call id="opencode_package" name="web_fetch">{"url": "https://example.com/1"}</call\'>;\n' +
+        '<tool_call id="opencode_readme" name="web_fetch">{"url": "https://example.com/2"}</call\'>;';
+      const result = adapter.processEvent({ parsed: textEvent(text), delta: text });
+      expect(result!.feedText).not.toContain("</call'>");
+      const matches = result!.feedText.match(/<\/tool_call>/g);
+      expect(matches).toHaveLength(2);
+    });
+
     it('preserves standard </tool_call> as-is', () => {
       const adapter = createGlmStreamAdapter();
       const text = '<tool_call id="a1" name="web_search">{"query":"test"}</tool_call>';

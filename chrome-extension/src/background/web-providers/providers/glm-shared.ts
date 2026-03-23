@@ -1,5 +1,5 @@
 /**
- * Shared GLM request builder — used by both glm-web.ts and glm-intl-web.ts.
+ * Shared GLM request builder — used by glm-web.ts (chatglm.cn).
  * Encapsulates the common headers, body structure, signing, and token refresh logic.
  */
 
@@ -123,21 +123,5 @@ const parseGlmSseDelta = (data: unknown): string | null => {
   return parts?.[0]?.content?.[0]?.text ?? null;
 };
 
-/**
- * Extended GLM parseSseDelta with fallback formats — for international endpoint
- * which may use alternative response shapes.
- */
-const parseGlmIntlSseDelta = (data: unknown): string | null => {
-  const primary = parseGlmSseDelta(data);
-  if (primary != null) return primary;
-  const obj = data as Record<string, unknown>;
-  return (
-    (obj.text as string | undefined) ??
-    (obj.content as string | undefined) ??
-    (obj.delta as string | undefined) ??
-    null
-  );
-};
-
-export { buildGlmRequestConfig, parseGlmSseDelta, parseGlmIntlSseDelta };
+export { buildGlmRequestConfig, parseGlmSseDelta };
 export type { GlmProviderConfig };

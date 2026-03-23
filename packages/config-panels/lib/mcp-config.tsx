@@ -218,6 +218,7 @@ const emptyForm: ServerFormData = {
   transport: 'auto',
   requireApproval: false,
   toolApprovalOverrides: {},
+
 };
 
 const ServerDialog = ({
@@ -298,6 +299,7 @@ const ServerDialog = ({
     try { new URL(form.url.trim()); } catch { setError('Invalid URL'); return; }
     onSave({ ...form, url: form.url.trim(), id: initial?.id });
   };
+
   return (
     <Dialog onOpenChange={o => !o && onClose()} open={open}>
       <DialogContent className="max-w-lg">
