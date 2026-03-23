@@ -209,6 +209,7 @@ const FullPageChat = () => {
       ([stored, savedModelId]) => {
         const mapped = stored.map(m => ({
           id: m.modelId || m.id,
+          dbId: m.id,
           name: m.name,
           provider: m.provider,
           description: m.description,
@@ -226,10 +227,19 @@ const FullPageChat = () => {
 
         setModels(mapped);
         if (mapped.length > 0) firstRunRef.current = false;
-        const restoredId =
-          savedModelId && mapped.some(m => m.id === savedModelId)
-            ? savedModelId
-            : (mapped[0]?.id ?? '');
+        // Try dbId first (new format), then fall back to modelId match (upgrade compat).
+        // TODO(compat): remove modelId fallback after a few versions — all users will have migrated to dbId by then.
+        let restoredId = '';
+        if (savedModelId) {
+          const byDbId = mapped.find(m => m.dbId === savedModelId);
+          const byModelId = !byDbId ? mapped.find(m => m.id === savedModelId) : undefined;
+          restoredId = byDbId?.dbId ?? byModelId?.dbId ?? '';
+        }
+        if (!restoredId) restoredId = mapped[0]?.dbId ?? '';
+        // TODO(compat): remove migration write-back after a few versions.
+        if (restoredId && restoredId !== savedModelId) {
+          selectedModelStorage.set(restoredId);
+        }
         setSelectedModelId(restoredId);
         setModelsLoaded(true);
       },
@@ -457,7 +467,7 @@ const FullPageChat = () => {
     loadModels();
   }, [loadModels]);
 
-  const selectedModel = models.find(m => m.id === selectedModelId) ?? models[0];
+  const selectedModel = models.find(m => m.dbId === selectedModelId) ?? models[0];
 
   // Loading state
   if (!modelsLoaded || sessionLoading) {

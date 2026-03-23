@@ -74,7 +74,7 @@ const providers = [
   {
     value: 'anthropic',
     label: 'Anthropic',
-    defaultModel: 'claude-sonnet-4-5-20250929',
+    defaultModel: 'claude-sonnet-4-5',
     defaultBase: '',
   },
   { value: 'google', label: 'Google', defaultModel: 'gemini-2.0-flash', defaultBase: '' },
@@ -315,7 +315,10 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
 
         {provider === 'web' ? (
           <div className="grid gap-2">
-            <Label htmlFor="setup-web-provider">Web Provider</Label>
+            <Label htmlFor="setup-web-provider">
+              Web Provider
+              <span className="text-muted-foreground ml-1 font-normal">(Uses your browser session — no API key needed)</span>
+            </Label>
             <Select
               onValueChange={v => {
                 setWebProviderId(v);
@@ -374,9 +377,6 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
                 </Button>
               )}
             </div>
-            <p className="text-muted-foreground text-xs">
-              Uses your browser session — no API key needed.
-            </p>
           </div>
         ) : (
           <>

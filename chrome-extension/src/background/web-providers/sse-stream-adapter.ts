@@ -6,6 +6,7 @@
 
 import { createClaudeStreamAdapter } from './providers/claude-web-stream-adapter';
 import { createGeminiStreamAdapter } from './providers/gemini-web-stream-adapter';
+import { createGlmIntlStreamAdapter } from './providers/glm-intl-stream-adapter';
 import { createGlmStreamAdapter } from './providers/glm-stream-adapter';
 import { createKimiStreamAdapter } from './providers/kimi-web-stream-adapter';
 import { createQwenStreamAdapter } from './providers/qwen-stream-adapter';
@@ -47,8 +48,9 @@ const getSseStreamAdapter = (providerId: WebProviderId): SseStreamAdapter => {
     case 'kimi-web':
       return createKimiStreamAdapter();
     case 'glm-web':
-    case 'glm-intl-web':
       return createGlmStreamAdapter();
+    case 'glm-intl-web':
+      return createGlmIntlStreamAdapter();
     case 'gemini-web':
       return createGeminiStreamAdapter();
     default:

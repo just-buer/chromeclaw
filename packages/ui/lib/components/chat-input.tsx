@@ -303,7 +303,7 @@ const ChatInput = ({
                 </SelectTrigger>
                 <SelectContent>
                   {models.map(model => (
-                    <SelectItem key={model.id} value={model.id}>
+                    <SelectItem key={model.dbId ?? model.id} value={model.dbId ?? model.id}>
                       {model.name}
                     </SelectItem>
                   ))}

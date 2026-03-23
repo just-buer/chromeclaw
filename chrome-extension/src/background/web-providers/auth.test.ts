@@ -43,7 +43,7 @@ const testProvider: WebProviderDefinition = {
   loginUrl: 'https://claude.ai',
   cookieDomain: '.claude.ai',
   sessionIndicators: ['sessionKey'],
-  defaultModelId: 'claude-sonnet-4-5-20250929',
+  defaultModelId: 'claude-sonnet-4-5',
   defaultModelName: 'Claude Sonnet 4.5',
   supportsTools: true,
   supportsReasoning: true,

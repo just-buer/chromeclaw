@@ -12,6 +12,7 @@ import {
   claudeToolStrategy,
   kimiToolStrategy,
   glmToolStrategy,
+  glmIntlToolStrategy,
   geminiToolStrategy,
 } from './tool-strategy';
 
@@ -30,8 +31,8 @@ describe('getToolStrategy', () => {
     expect(getToolStrategy('glm-web')).toBe(glmToolStrategy);
   });
 
-  it('returns glm strategy for glm-intl-web', () => {
-    expect(getToolStrategy('glm-intl-web')).toBe(glmToolStrategy);
+  it('returns glm-intl strategy for glm-intl-web', () => {
+    expect(getToolStrategy('glm-intl-web')).toBe(glmIntlToolStrategy);
   });
 
   it('returns claude strategy for claude-web', () => {
@@ -584,6 +585,85 @@ describe('glmToolStrategy', () => {
       ]);
       expect(result).not.toContain('<think>');
       expect(result).toBe('Hello');
+    });
+  });
+});
+
+// ── GLM International Strategy ──────────────────
+
+describe('glmIntlToolStrategy', () => {
+  it('uses markdown tool prompt (same as qwen)', () => {
+    const tools = [
+      {
+        name: 'test',
+        description: 'A test tool',
+        parameters: { type: 'object', properties: {} },
+      },
+    ];
+    expect(glmIntlToolStrategy.buildToolPrompt(tools)).toBe(
+      qwenToolStrategy.buildToolPrompt(tools),
+    );
+  });
+
+  describe('buildPrompt', () => {
+    it('aggregates full history on first turn (no conversationId)', () => {
+      const result = glmIntlToolStrategy.buildPrompt({
+        systemPrompt: 'Be helpful.',
+        toolPrompt: '## Tools...',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there' },
+        ],
+      });
+      expect(result.systemPrompt).toBe('');
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].content).toContain('System: Be helpful.');
+      expect(result.messages[0].content).toContain('## Tools...');
+      expect(result.messages[0].content).toContain('User: Hello');
+      expect(result.messages[0].content).toContain('Assistant: Hi there');
+    });
+
+    it('sends only last message on continuation', () => {
+      const result = glmIntlToolStrategy.buildPrompt({
+        systemPrompt: 'Be helpful.',
+        toolPrompt: '## Tools...',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi' },
+          { role: 'user', content: 'Follow up' },
+        ],
+        conversationId: 'chat-123',
+      });
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].content).toContain('Follow up');
+      expect(result.messages[0].content).not.toContain('Hello');
+    });
+  });
+
+  describe('extractConversationId', () => {
+    it('extracts chat_id from synthetic SSE event', () => {
+      expect(glmIntlToolStrategy.extractConversationId!({ type: 'glm:chat_id', chat_id: 'abc-123' })).toBe('abc-123');
+    });
+
+    it('returns undefined when no chat_id present', () => {
+      expect(glmIntlToolStrategy.extractConversationId!({ type: 'chat:completion', data: {} })).toBeUndefined();
+    });
+
+    it('returns undefined for unrelated data', () => {
+      expect(glmIntlToolStrategy.extractConversationId!({ text: 'hello' })).toBeUndefined();
+    });
+  });
+
+  describe('serializeAssistantContent', () => {
+    it('serializes think, text, and tool_call blocks', () => {
+      const result = glmIntlToolStrategy.serializeAssistantContent!([
+        { type: 'thinking', thinking: 'reasoning' },
+        { type: 'text', text: 'I will search.' },
+        { type: 'toolCall', id: 'x1', name: 'web_search', arguments: { query: 'cats' } },
+      ]);
+      expect(result).toContain('<think>');
+      expect(result).toContain('I will search.');
+      expect(result).toContain('<tool_call id="x1" name="web_search">');
     });
   });
 });

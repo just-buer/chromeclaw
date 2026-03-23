@@ -108,6 +108,8 @@ type ModelApi = 'openai-completions' | 'openai-responses' | 'openai-codex-respon
 /** Model configuration */
 interface ChatModel {
   id: string;
+  /** Unique database ID for UI selection. Different from `id` which is the model identifier sent to the provider. */
+  dbId?: string;
   name: string;
   provider: ModelProvider;
   description?: string;
@@ -133,8 +135,8 @@ const WEB_PROVIDER_OPTIONS = [
   { value: 'kimi-web', label: 'Kimi (kimi.com)', loginUrl: 'https://www.kimi.com', cookieDomain: '.kimi.com', sessionIndicators: ['access_token'], checkLocalStorage: true, defaultModelId: 'kimi', defaultModelName: 'Kimi' },
   { value: 'qwen-web', label: 'Qwen (chat.qwen.ai)', loginUrl: 'https://chat.qwen.ai', cookieDomain: '.qwen.ai', sessionIndicators: ['token', 'ctoken', 'login_aliyunid_ticket'], defaultModelId: 'qwen3.5-plus', defaultModelName: 'Qwen 3.5 Plus' },
   { value: 'qwen-cn-web', label: 'Qwen CN (qianwen.com)', loginUrl: 'https://qianwen.com', cookieDomain: '.qianwen.com', sessionIndicators: ['tongyi_sso_ticket'], defaultModelId: 'qwen-max', defaultModelName: 'Qwen Max (CN)' },
-  { value: 'glm-web', label: 'GLM (chatglm.cn)', loginUrl: 'https://chatglm.cn', cookieDomain: '.chatglm.cn', sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'], defaultModelId: 'glm-4', defaultModelName: 'GLM-4', refreshUrl: 'https://chatglm.cn/chatglm/user-api/user/refresh' },
-  { value: 'glm-intl-web', label: 'GLM Intl (chat.z.ai)', loginUrl: 'https://chat.z.ai', cookieDomain: '.z.ai', sessionIndicators: ['chatglm_refresh_token', 'chatglm_token', 'refresh_token', 'auth_token', 'access_token', 'token'], defaultModelId: 'glm-4', defaultModelName: 'GLM-4 International', refreshUrl: 'https://chat.z.ai/chatglm/user-api/user/refresh' },
+  { value: 'glm-web', label: 'GLM (chatglm.cn)', loginUrl: 'https://chatglm.cn', cookieDomain: '.chatglm.cn', sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'], defaultModelId: 'glm-5', defaultModelName: 'GLM-5', refreshUrl: 'https://chatglm.cn/chatglm/user-api/user/refresh' },
+  { value: 'glm-intl-web', label: 'GLM Intl (chat.z.ai)', loginUrl: 'https://chat.z.ai', cookieDomain: '.z.ai', sessionIndicators: ['token'], checkLocalStorage: true, defaultModelId: 'glm-5', defaultModelName: 'GLM-5' },
   { value: 'gemini-web', label: 'Gemini (gemini.google.com)', loginUrl: 'https://gemini.google.com', cookieDomain: '.google.com', sessionIndicators: ['__Secure-1PSID', 'SID'], defaultModelId: 'gemini-3-flash', defaultModelName: 'Gemini 3 Flash' },
 ] as const;
 

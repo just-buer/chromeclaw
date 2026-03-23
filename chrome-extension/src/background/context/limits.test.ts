@@ -47,7 +47,7 @@ describe('context-limits (re-export shim)', () => {
 
   it('Anthropic models have 200k context', () => {
     expect(getModelContextLimit('claude-opus-4-6')).toBe(200_000);
-    expect(getModelContextLimit('claude-sonnet-4-5-20250929')).toBe(200_000);
+    expect(getModelContextLimit('claude-sonnet-4-5')).toBe(200_000);
   });
 
   it('Gemini models have 1M+ context', () => {

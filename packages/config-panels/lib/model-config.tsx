@@ -19,6 +19,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,6 +39,7 @@ import {
 import {
   BrainCircuitIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
   DownloadIcon,
   Loader2Icon,
   LogInIcon,
@@ -55,7 +59,7 @@ type ModelFormData = Omit<DbChatModel, 'id'> & { id?: string };
 
 const defaultModelIds: Record<string, string> = {
   openai: 'gpt-4o',
-  anthropic: 'claude-sonnet-4-5-20250929',
+  anthropic: 'claude-sonnet-4-5',
   google: 'gemini-2.0-flash',
   openrouter: 'openai/gpt-4o',
   custom: '',
@@ -687,13 +691,16 @@ const ModelConfig = () => {
                     ? 'The HuggingFace model ID (e.g. HuggingFaceTB/SmolLM2-360M-Instruct)'
                     : isWeb
                       ? 'Auto-detected from web provider. Override only if needed.'
-                      : 'The model identifier sent to the provider (e.g. gpt-4o, claude-sonnet-4-5-20250929)'}
+                      : 'The model identifier sent to the provider (e.g. gpt-4o, claude-sonnet-4-5)'}
                 </p>
               </div>
 
               {isWeb && (
                 <div className="grid gap-2">
-                  <Label htmlFor="web-provider-id">Web Provider</Label>
+                  <Label htmlFor="web-provider-id">
+                    Web Provider
+                    <span className="text-muted-foreground ml-1 font-normal">(Uses your browser session — no API key needed)</span>
+                  </Label>
                   <Select
                     onValueChange={v => handleFormChange('webProviderId', v)}
                     value={editForm.webProviderId ?? ''}>
@@ -747,9 +754,6 @@ const ModelConfig = () => {
                       </Button>
                     )}
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    Uses your browser session — no API key needed.
-                  </p>
                 </div>
               )}
 
@@ -875,33 +879,41 @@ const ModelConfig = () => {
                 </label>
               </div>
 
-              {!isLocal && (
-                <div className="grid gap-2">
-                  <Label htmlFor="tool-timeout">{t('model_toolTimeout')}</Label>
-                  <Input
-                    id="tool-timeout"
-                    min={10}
-                    onChange={e => handleFormChange('toolTimeoutSeconds', e.target.value)}
-                    placeholder="600"
-                    type="number"
-                    value={editForm.toolTimeoutSeconds ?? ''}
-                  />
-                  <p className="text-muted-foreground text-xs">{t('model_toolTimeoutHint')}</p>
-                </div>
-              )}
+              <Collapsible className="group">
+                <CollapsibleTrigger className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-sm">
+                  <ChevronDownIcon className="size-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                  {t('model_advanced')}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-3">
+                  {!isLocal && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="tool-timeout">{t('model_toolTimeout')}</Label>
+                      <Input
+                        id="tool-timeout"
+                        min={10}
+                        onChange={e => handleFormChange('toolTimeoutSeconds', e.target.value)}
+                        placeholder="600"
+                        type="number"
+                        value={editForm.toolTimeoutSeconds ?? ''}
+                      />
+                      <p className="text-muted-foreground text-xs">{t('model_toolTimeoutHint')}</p>
+                    </div>
+                  )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="context-window">{t('model_contextWindow')}</Label>
-                <Input
-                  id="context-window"
-                  min={1024}
-                  onChange={e => handleFormChange('contextWindow', e.target.value)}
-                  placeholder={t('model_contextWindowPlaceholder')}
-                  type="number"
-                  value={editForm.contextWindow ?? ''}
-                />
-                <p className="text-muted-foreground text-xs">{t('model_contextWindowHint')}</p>
-              </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="context-window">{t('model_contextWindow')}</Label>
+                    <Input
+                      id="context-window"
+                      min={1024}
+                      onChange={e => handleFormChange('contextWindow', e.target.value)}
+                      placeholder={t('model_contextWindowPlaceholder')}
+                      type="number"
+                      value={editForm.contextWindow ?? ''}
+                    />
+                    <p className="text-muted-foreground text-xs">{t('model_contextWindowHint')}</p>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               {isLocal && downloadProgress && (
                 <div className="space-y-2">

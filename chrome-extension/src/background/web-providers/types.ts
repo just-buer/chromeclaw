@@ -60,7 +60,7 @@ interface WebProviderDefinition {
     /** When true, `url` is a template — `{key}` placeholders are replaced from setup response. */
     urlTemplate?: boolean;
     /** When set, the response uses a binary-framed protocol instead of plain SSE text. */
-    binaryProtocol?: 'connect-json' | 'gemini-chunks';
+    binaryProtocol?: 'connect-json' | 'gemini-chunks' | 'glm-intl';
     /** When true, encode the JSON body into a binary frame before sending. */
     binaryEncodeBody?: boolean;
   };
