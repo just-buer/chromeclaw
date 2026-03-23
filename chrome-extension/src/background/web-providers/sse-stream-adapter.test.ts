@@ -83,14 +83,14 @@ describe('getSseStreamAdapter', () => {
     ).toThrow('GLM error');
   });
 
-  it('returns a GLM adapter for glm-intl-web', () => {
+  it('returns a GLM Intl adapter for glm-intl-web', () => {
     const adapter = getSseStreamAdapter('glm-intl-web');
-    expect(() =>
-      adapter.processEvent({
-        parsed: { error: { message: 'GLM intl error' } },
-        delta: null,
-      }),
-    ).toThrow('GLM intl error');
+    // GLM Intl adapter handles phase-based thinking/answer — wraps thinking in <think>
+    const result = adapter.processEvent({
+      parsed: { type: 'chat:completion', data: { delta_content: 'hello', phase: 'answer' } },
+      delta: null,
+    });
+    expect(result).toEqual({ feedText: 'hello' });
   });
 
   it('returns a Claude adapter for claude-web', () => {

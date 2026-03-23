@@ -1,5 +1,6 @@
 import { t, useT } from '@extension/i18n';
 import { toolRegistryMeta } from '@extension/shared';
+import { IS_FIREFOX } from '@extension/env';
 import {
   defaultWebSearchConfig,
   defaultDeepResearchConfig,
@@ -501,6 +502,7 @@ const ToolConfig = () => {
           {/* Non-Google tool groups */}
           {toolRegistryMeta
             .filter(g => !GOOGLE_GROUPS.has(g.groupKey))
+            .filter(g => !IS_FIREFOX || !g.tools.every(t => t.chromeOnly))
             .map((group, idx) => {
               const Icon = iconMap[group.iconName];
               return (

@@ -458,6 +458,9 @@
   "model_supportsReasoning": {
     "message": "Supports Reasoning"
   },
+  "model_advanced": {
+    "message": "Advanced"
+  },
   "model_toolTimeout": {
     "message": "Tool Timeout (seconds)"
   },

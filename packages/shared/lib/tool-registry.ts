@@ -14,6 +14,8 @@ interface ToolMeta {
   description: string;
   /** Default enabled state */
   defaultEnabled: boolean;
+  /** If true, this tool is Chrome-only and should be hidden on Firefox */
+  chromeOnly?: boolean;
 }
 
 interface ToolGroupMeta {
@@ -454,6 +456,7 @@ Summarize the key points naturally — do not just say "the subagent finished."`
         label: 'Debugger',
         description: 'Send Chrome DevTools Protocol commands to browser tabs',
         defaultEnabled: false,
+        chromeOnly: true,
       },
     ],
   },

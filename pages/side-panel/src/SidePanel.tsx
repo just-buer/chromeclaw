@@ -197,6 +197,7 @@ const SidePanel = () => {
       ([stored, savedModelId]) => {
         const mapped = stored.map(m => ({
           id: m.modelId || m.id,
+          dbId: m.id,
           name: m.name,
           provider: m.provider,
           description: m.description,
@@ -214,11 +215,20 @@ const SidePanel = () => {
 
         setModels(mapped);
         if (mapped.length > 0) firstRunRef.current = false;
-        // Restore persisted selection if valid, otherwise fall back to first model
-        const restoredId =
-          savedModelId && mapped.some(m => m.id === savedModelId)
-            ? savedModelId
-            : (mapped[0]?.id ?? '');
+        // Restore persisted selection if valid, otherwise fall back to first model.
+        // Try dbId first (new format), then fall back to modelId match (upgrade compat).
+        // TODO(compat): remove modelId fallback after a few versions — all users will have migrated to dbId by then.
+        let restoredId = '';
+        if (savedModelId) {
+          const byDbId = mapped.find(m => m.dbId === savedModelId);
+          const byModelId = !byDbId ? mapped.find(m => m.id === savedModelId) : undefined;
+          restoredId = byDbId?.dbId ?? byModelId?.dbId ?? '';
+        }
+        if (!restoredId) restoredId = mapped[0]?.dbId ?? '';
+        // TODO(compat): remove migration write-back after a few versions.
+        if (restoredId && restoredId !== savedModelId) {
+          selectedModelStorage.set(restoredId);
+        }
         setSelectedModelId(restoredId);
         setModelsLoaded(true);
       },
@@ -513,7 +523,7 @@ const SidePanel = () => {
     return () => chrome.runtime.onMessage.removeListener(handler);
   }, [reloadMessages, loadAndSwitchToChat]);
 
-  const selectedModel = models.find(m => m.id === selectedModelId) ?? models[0];
+  const selectedModel = models.find(m => m.dbId === selectedModelId) ?? models[0];
 
   // Loading state
   if (!modelsLoaded || sessionLoading) {

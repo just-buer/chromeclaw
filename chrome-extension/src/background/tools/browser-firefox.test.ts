@@ -161,18 +161,48 @@ describe('browser-firefox — content & scripting actions', () => {
   });
 });
 
-describe('browser-firefox — unsupported actions', () => {
-  it('click action returns helpful error', async () => {
+describe('browser-firefox — click and type actions', () => {
+  it('click action injects script and returns result', async () => {
+    mockScriptingExecuteScript.mockResolvedValueOnce([{ result: 'Clicked element [5] <button> "Submit".' }]);
     const result = (await executeBrowserFirefox({ action: 'click', tabId: 1, ref: 5 })) as string;
-    expect(result).toContain('evaluate');
-    expect(result).toContain('querySelector');
+    expect(result).toContain('Clicked element [5]');
+    expect(mockScriptingExecuteScript).toHaveBeenCalled();
   });
 
-  it('type action returns helpful error', async () => {
-    const result = (await executeBrowserFirefox({ action: 'type', tabId: 1, ref: 5, text: 'hello' })) as string;
-    expect(result).toContain('evaluate');
+  it('click action returns error when ref not found', async () => {
+    mockScriptingExecuteScript.mockResolvedValueOnce([{ result: 'Error: Ref [99] not found. Run "snapshot" to refresh refs.' }]);
+    const result = (await executeBrowserFirefox({ action: 'click', tabId: 1, ref: 99 })) as string;
+    expect(result).toContain('Ref [99] not found');
   });
 
+  it('click action requires tabId', async () => {
+    const result = (await executeBrowserFirefox({ action: 'click' })) as string;
+    expect(result).toContain('tabId');
+    expect(result).toContain('required');
+  });
+
+  it('click action requires ref', async () => {
+    const result = (await executeBrowserFirefox({ action: 'click', tabId: 1 })) as string;
+    expect(result).toContain('ref');
+    expect(result).toContain('required');
+  });
+
+  it('type action injects script and returns result', async () => {
+    mockScriptingExecuteScript.mockResolvedValueOnce([{ result: 'Typed "hello" into element [3].' }]);
+    const result = (await executeBrowserFirefox({ action: 'type', tabId: 1, ref: 3, text: 'hello' })) as string;
+    expect(result).toContain('Typed');
+    expect(result).toContain('[3]');
+    expect(mockScriptingExecuteScript).toHaveBeenCalled();
+  });
+
+  it('type action requires text', async () => {
+    const result = (await executeBrowserFirefox({ action: 'type', tabId: 1, ref: 3 })) as string;
+    expect(result).toContain('text');
+    expect(result).toContain('required');
+  });
+});
+
+describe('browser-firefox — unsupported actions', () => {
   it('console action returns unavailable message', async () => {
     const result = (await executeBrowserFirefox({ action: 'console', tabId: 1 })) as string;
     expect(result.toLowerCase()).toContain('unavailable');
@@ -191,5 +221,20 @@ describe('browser-firefox — input validation', () => {
     const result = (await executeBrowserFirefox({ action: 'content' })) as string;
     expect(result.toLowerCase()).toContain('error');
     expect(result.toLowerCase()).toContain('tabid');
+  });
+
+  it('coerces string tabId to number', async () => {
+    await executeBrowserFirefox({ action: 'focus', tabId: '42' as unknown as number });
+    expect(mockTabsUpdate).toHaveBeenCalledWith(42, { active: true });
+  });
+
+  it('coerces string ref to number for click', async () => {
+    mockScriptingExecuteScript.mockResolvedValueOnce([{ result: 'Clicked element [3] <a>.' }]);
+    const result = (await executeBrowserFirefox({ action: 'click', tabId: 1, ref: '3' as unknown as number })) as string;
+    expect(result).toContain('Clicked element [3]');
+    expect(mockScriptingExecuteScript).toHaveBeenCalled();
+    // Verify the ref was passed as a number to the injected script
+    const lastCall = mockScriptingExecuteScript.mock.calls[mockScriptingExecuteScript.mock.calls.length - 1];
+    expect(lastCall[0].args[0]).toBe(3);
   });
 });

@@ -305,7 +305,7 @@ const Chat = ({
               }
               sendMessage(content, attachments);
             }}
-            selectedModelId={selectedModel.id}
+            selectedModelId={selectedModel.dbId ?? selectedModel.id}
             setInput={setInput}
             status={isCompacting ? 'connecting' : status}
             stop={stop}

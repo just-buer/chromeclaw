@@ -573,6 +573,7 @@ export const runAgent = async (opts: RunAgentOpts): Promise<RunAgentResult> => {
 
 export const dbModelToChatModel = (m: DbChatModel): ChatModel => ({
   id: m.modelId,
+  dbId: m.id,
   name: m.name,
   provider: m.provider as ModelProvider,
   description: m.description,
