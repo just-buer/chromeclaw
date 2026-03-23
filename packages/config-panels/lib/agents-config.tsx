@@ -19,7 +19,9 @@ import {
   copyGlobalSkillsToAgent,
   activeAgentStorage,
   toolConfigStorage,
+  mcpServersStorage,
 } from '@extension/storage';
+import type { McpServerConfig } from '@extension/storage';
 import {
   Badge,
   Button,
@@ -79,6 +81,7 @@ import {
   UploadIcon,
   UsersIcon,
   WrenchIcon,
+  ServerIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -1090,6 +1093,7 @@ const GOOGLE_GROUPS = new Set(['gmail', 'calendar', 'drive']);
 const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () => void }) => {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [globalConfig, setGlobalConfig] = useState<ToolConfigData | null>(null);
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
 
@@ -1107,9 +1111,14 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const [agent, global] = await Promise.all([getAgent(agentId), toolConfigStorage.get()]);
+      const [agent, global, servers] = await Promise.all([
+        getAgent(agentId),
+        toolConfigStorage.get(),
+        mcpServersStorage.get(),
+      ]);
       if (agent) setAgentConfig(agent);
       setGlobalConfig(global);
+      setMcpServers(servers);
     } catch (err) {
       console.error('Failed to load tool config', err);
     } finally {
@@ -1195,6 +1204,18 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
       );
     },
     [agentConfig, agentId, globalConfig],
+  );
+
+  const handleMcpServerToggle = useCallback(
+    async (serverId: string, value: boolean) => {
+      if (!agentConfig) return;
+      const nextOverrides = { ...(agentConfig.mcpServerOverrides ?? {}), [serverId]: value };
+      await updateAgent(agentId, { mcpServerOverrides: nextOverrides });
+      setAgentConfig(prev =>
+        prev ? { ...prev, mcpServerOverrides: nextOverrides, updatedAt: Date.now() } : null,
+      );
+    },
+    [agentConfig, agentId],
   );
 
   const handleRemoveCustomTool = useCallback(
@@ -1436,7 +1457,7 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                       {ct.params.length > 0 && (
                         <p className="text-muted-foreground text-xs">
                           Params: {ct.params.map(p => p.name).join(', ')}
-                        </p>
+                          </p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -1461,6 +1482,77 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
             </CardContent>
           </Card>
         )}
+
+        {/* MCP Servers — per-agent overrides */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ServerIcon className="size-4" />
+              MCP Servers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mcpServers.length === 0 ? (
+              <p className="text-muted-foreground py-4 text-center text-xs">
+                No MCP servers configured. Add servers in Settings › MCP.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {mcpServers.map(server => {
+                  const override = agentConfig?.mcpServerOverrides?.[server.id];
+                  const effectiveEnabled = override !== undefined ? override : server.enabled;
+                  const checkboxId = `agent-mcp-${server.id}`;
+                  return (
+                    <div key={server.id} className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <Label className="cursor-pointer text-sm" htmlFor={checkboxId}>
+                          {server.name}
+                        </Label>
+                        <p className="text-muted-foreground truncate font-mono text-xs">
+                          {server.url}
+                          {override !== undefined && (
+                            <span className="text-primary ml-1.5 font-sans not-italic">
+                              (覆盖全局)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {override !== undefined && (
+                          <button
+                            className="text-muted-foreground hover:text-foreground rounded p-1 text-xs underline"
+                            onClick={async () => {
+                              if (!agentConfig) return;
+                              const next = { ...(agentConfig.mcpServerOverrides ?? {}) };
+                              delete next[server.id];
+                              await updateAgent(agentId, { mcpServerOverrides: next });
+                              setAgentConfig(prev =>
+                                prev
+                                  ? { ...prev, mcpServerOverrides: next, updatedAt: Date.now() }
+                                  : null,
+                              );
+                            }}
+                            title="重置为全局默认"
+                            type="button">
+                            ↺
+                          </button>
+                        )}
+                        <input
+                          checked={effectiveEnabled}
+                          className="accent-primary size-4 cursor-pointer"
+                          id={checkboxId}
+                          onChange={e => handleMcpServerToggle(server.id, e.target.checked)}
+                          type="checkbox"
+                        />
+                        <span className="text-muted-foreground text-xs">启用</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </ScrollArea>
   );

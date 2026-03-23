@@ -29,6 +29,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Separator,
 } from '@extension/ui';
 import {
   CheckCircleIcon,
@@ -208,6 +209,7 @@ interface ServerFormData {
   transport: Transport;
   requireApproval: boolean;
   toolApprovalOverrides: Record<string, boolean>;
+  toolEnabledOverrides: Record<string, boolean>;
 }
 
 const emptyForm: ServerFormData = {
@@ -218,7 +220,7 @@ const emptyForm: ServerFormData = {
   transport: 'auto',
   requireApproval: false,
   toolApprovalOverrides: {},
-
+  toolEnabledOverrides: {},
 };
 
 const ServerDialog = ({
@@ -242,6 +244,7 @@ const ServerDialog = ({
           transport: (initial.transport ?? 'auto') as Transport,
           requireApproval: initial.requireApproval ?? false,
           toolApprovalOverrides: initial.toolApprovalOverrides ?? {},
+          toolEnabledOverrides: initial.toolEnabledOverrides ?? {},
         }
       : emptyForm,
   );
@@ -261,6 +264,7 @@ const ServerDialog = ({
               transport: (initial.transport ?? 'auto') as Transport,
               requireApproval: initial.requireApproval ?? false,
               toolApprovalOverrides: initial.toolApprovalOverrides ?? {},
+              toolEnabledOverrides: initial.toolEnabledOverrides ?? {},
             }
           : emptyForm,
       );
@@ -384,47 +388,94 @@ const ServerDialog = ({
 
               {/* Per-tool overrides */}
               {testTools.length > 0 && (
-                <div className="max-h-48 space-y-1 overflow-y-auto">
-                  {testTools.map(t => {
-                    const override = form.toolApprovalOverrides[t.name];
-                    const effective = override ?? form.requireApproval;
+                <div className="mt-3 max-h-56 space-y-3 overflow-y-auto">
+                  <Separator />
+                  {testTools.map((t, idx) => {
+                    const enabledId = `mcp-tool-enabled-${t.name}`;
+                    const approvalId = `mcp-tool-approval-${t.name}`;
+                    const approvalOverride = form.toolApprovalOverrides[t.name];
+                    const effectiveApproval = approvalOverride ?? form.requireApproval;
+                    const enabledOverride = form.toolEnabledOverrides[t.name];
+                    const effectiveEnabled = enabledOverride !== undefined ? enabledOverride : true;
+                    const hasAnyOverride = approvalOverride !== undefined || enabledOverride !== undefined;
                     return (
-                      <div key={t.name} className="flex items-center justify-between gap-2">
-                        <Badge className="font-mono text-xs" variant="secondary">
-                          {t.name}
-                        </Badge>
-                        <div className="flex items-center gap-1">
-                          <input
-                            checked={effective}
-                            className="accent-yellow-500 size-3.5 cursor-pointer"
-                            onChange={e => {
-                              const val = e.target.checked;
-                              setForm(prev => ({
-                                ...prev,
-                                toolApprovalOverrides: {
-                                  ...prev.toolApprovalOverrides,
-                                  [t.name]: val,
-                                },
-                              }));
-                            }}
-                            title={override !== undefined ? 'Override' : 'Inherits server default'}
-                            type="checkbox"
-                          />
-                          {override !== undefined && (
-                            <button
-                              className="text-muted-foreground hover:text-foreground text-xs underline"
-                              onClick={() => {
-                                setForm(prev => {
-                                  const overrides = { ...prev.toolApprovalOverrides };
-                                  delete overrides[t.name];
-                                  return { ...prev, toolApprovalOverrides: overrides };
-                                });
-                              }}
-                              title="Reset to server default"
-                              type="button">
-                              ↺
-                            </button>
-                          )}
+                      <div key={t.name}>
+                        {idx > 0 && <Separator className="mb-3" />}
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <Label
+                                className={`text-sm${!effectiveEnabled ? ' text-muted-foreground line-through' : ''}`}
+                                htmlFor={enabledId}>
+                                {t.name}
+                              </Label>
+                              {hasAnyOverride && (
+                                <button
+                                  className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline"
+                                  onClick={() => {
+                                    setForm(prev => {
+                                      const approvals = { ...prev.toolApprovalOverrides };
+                                      const enabled = { ...prev.toolEnabledOverrides };
+                                      delete approvals[t.name];
+                                      delete enabled[t.name];
+                                      return { ...prev, toolApprovalOverrides: approvals, toolEnabledOverrides: enabled };
+                                    });
+                                  }}
+                                  title="重置为默认值"
+                                  type="button">
+                                  ↺
+                                </button>
+                              )}
+                            </div>
+                            {t.description && (
+                              <p className="text-muted-foreground text-xs">{t.description}</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3">
+                            {/* Approval — only shown when tool is enabled */}
+                            {effectiveEnabled && (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    checked={effectiveApproval}
+                                    className="accent-yellow-500 size-3.5 cursor-pointer"
+                                    id={approvalId}
+                                    onChange={e => {
+                                      const val = e.target.checked;
+                                      setForm(prev => ({
+                                        ...prev,
+                                        toolApprovalOverrides: { ...prev.toolApprovalOverrides, [t.name]: val },
+                                      }));
+                                    }}
+                                    title={approvalOverride !== undefined ? '已覆盖服务器默认值' : '继承服务器默认值'}
+                                    type="checkbox"
+                                  />
+                                  <Label className="text-muted-foreground cursor-pointer text-xs" htmlFor={approvalId}>
+                                    审批
+                                  </Label>
+                                </div>
+                                <Separator className="h-4" orientation="vertical" />
+                              </>
+                            )}
+                            {/* Enabled toggle */}
+                            <div className="flex items-center gap-1">
+                              <input
+                                checked={effectiveEnabled}
+                                className="accent-primary size-4 cursor-pointer"
+                                id={enabledId}
+                                onChange={e => {
+                                  const val = e.target.checked;
+                                  setForm(prev => ({
+                                    ...prev,
+                                    toolEnabledOverrides: { ...prev.toolEnabledOverrides, [t.name]: val },
+                                  }));
+                                }}
+                                title={enabledOverride !== undefined ? '已覆盖默认值' : '默认启用'}
+                                type="checkbox"
+                              />
+                              <span className="text-muted-foreground text-xs">启用</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -497,23 +548,26 @@ const McpConfig = () => {
     transport: Transport;
     requireApproval: boolean;
     toolApprovalOverrides: Record<string, boolean>;
+    toolEnabledOverrides: Record<string, boolean>;
   }) => {
     const transport = data.transport === 'auto' ? undefined : data.transport;
     const requireApproval = data.requireApproval || undefined;
     const toolApprovalOverrides =
       Object.keys(data.toolApprovalOverrides).length > 0 ? data.toolApprovalOverrides : undefined;
+    const toolEnabledOverrides =
+      Object.keys(data.toolEnabledOverrides).length > 0 ? data.toolEnabledOverrides : undefined;
     if (data.id) {
       await persist(
         servers.map(s =>
           s.id === data.id
-            ? { ...s, name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides }
+            ? { ...s, name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides, toolEnabledOverrides }
             : s,
         ),
       );
     } else {
       await persist([
         ...servers,
-        { id: nanoid(), name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides },
+        { id: nanoid(), name: data.name, url: data.url, apiKey: data.apiKey || undefined, enabled: data.enabled, transport, requireApproval, toolApprovalOverrides, toolEnabledOverrides },
       ]);
     }
     setDialogOpen(false);

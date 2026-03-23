@@ -181,7 +181,9 @@ const getAgentTools = async (opts?: {
 
   // Inject remote MCP server tools
   try {
-    const mcpTools = await getRemoteMcpAgentTools();
+    const agentIdForMcp = await activeAgentStorage.get();
+    const agentForMcp = agentIdForMcp ? await getAgent(agentIdForMcp) : undefined;
+    const mcpTools = await getRemoteMcpAgentTools(agentForMcp?.mcpServerOverrides);
     tools.push(...mcpTools);
   } catch (err) {
     toolLog.warn('Failed to load remote MCP tools', {

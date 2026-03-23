@@ -160,6 +160,8 @@ interface AgentConfig {
   model?: AgentModelConfig;
   toolConfig?: import('./tool-config-storage.js').ToolConfig;
   customTools?: CustomToolDef[];
+  /** Per-agent MCP server overrides. Key = server ID. Overrides the global server enabled state. */
+  mcpServerOverrides?: Record<string, boolean>;
   compactionConfig?: {
     maxHistoryShare?: number;
     recentTurnsPreserve?: number;

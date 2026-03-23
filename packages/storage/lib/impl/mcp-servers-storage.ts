@@ -19,6 +19,8 @@ interface McpServerConfig {
   requireApproval?: boolean;
   /** Per-tool approval overrides. Key = tool name. Overrides requireApproval when set. */
   toolApprovalOverrides?: Record<string, boolean>;
+  /** Per-tool enabled overrides. Key = tool name. When false, the tool is hidden from the agent. Defaults to true when unset. */
+  toolEnabledOverrides?: Record<string, boolean>;
 }
 
 export const mcpServersStorage = createStorage<McpServerConfig[]>('mcp-servers', [], {

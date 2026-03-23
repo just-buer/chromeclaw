@@ -343,9 +343,13 @@ export async function callMcpTool(
 // AgentTool factory — called from tools/index.ts > getAgentTools()
 // ---------------------------------------------------------------------------
 
-export async function getRemoteMcpAgentTools(): Promise<AgentTool[]> {
+export async function getRemoteMcpAgentTools(
+  agentMcpOverrides?: Record<string, boolean>,
+): Promise<AgentTool[]> {
   const servers = await mcpServersStorage.get();
-  const enabled = servers.filter(s => s.enabled);
+  const enabled = servers.filter(s =>
+    agentMcpOverrides?.[s.id] !== undefined ? agentMcpOverrides[s.id] : s.enabled,
+  );
   if (enabled.length === 0) return [];
 
   const perServer = await Promise.allSettled(
@@ -358,7 +362,9 @@ export async function getRemoteMcpAgentTools(): Promise<AgentTool[]> {
         mcpLog.debug(`Cached ${tools.length} tools from MCP server "${server.name}"`);
       }
 
-      return tools.map(
+      return tools
+        .filter(tool => server.toolEnabledOverrides?.[tool.name] !== false)
+        .map(
         (tool): AgentTool & { requiresApproval?: boolean } => ({
           name: tool.name,
           label: `[${server.name}] ${tool.name}`,
