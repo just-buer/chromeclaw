@@ -27,6 +27,7 @@ import {
   copyGlobalSkillsToAgent,
   listSkillFiles,
   updateWorkspaceFile,
+  listWorkspaceFiles,
 } from '@extension/storage';
 import {
   CheckCircleIcon,
@@ -89,8 +90,8 @@ const providers = [
 
 const TOTAL_STEPS = IS_FIREFOX ? 6 : 5;
 const STEP_LABELS = IS_FIREFOX
-  ? (['firstRun_stepModel', 'firstRun_stepPermissions', 'firstRun_stepChannels', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const)
-  : (['firstRun_stepModel', 'firstRun_stepChannels', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const);
+  ? (['firstRun_stepModel', 'firstRun_stepPermissions', 'firstRun_stepAgent', 'firstRun_stepChannels', 'firstRun_stepTools', 'firstRun_stepSkills'] as const)
+  : (['firstRun_stepModel', 'firstRun_stepAgent', 'firstRun_stepChannels', 'firstRun_stepTools', 'firstRun_stepSkills'] as const);
 
 /** Groups to exclude from the onboarding tool picker (require OAuth or feature flags). */
 const EXCLUDED_TOOL_GROUPS = new Set(['gmail', 'calendar', 'drive']);
@@ -753,6 +754,12 @@ const Step2ChannelSetup = ({
 
 /* ---------- Step 3: Agent Setup ---------- */
 
+const AGENT_TEMPLATES = [
+  { id: 'claw', name: 'Claw', emoji: '\u{1F99E}', keyPrefix: 'agent_tpl_claw' },
+  { id: 'sage', name: 'Sage', emoji: '\u{1F9ED}', keyPrefix: 'agent_tpl_sage' },
+  { id: 'slate', name: 'Slate', emoji: '\u25FC\uFE0F', keyPrefix: 'agent_tpl_slate' },
+] as const;
+
 const Step3AgentSetup = ({
   onNext,
   onBack,
@@ -762,10 +769,31 @@ const Step3AgentSetup = ({
   onBack: () => void;
   t: TFunction;
 }) => {
-  const [agentName, setAgentName] = useState('Main Agent');
-  const [agentEmoji, setAgentEmoji] = useState('\u{1F916}');
+  const tplKey = (prefix: string, field: string) =>
+    t(`${prefix}_${field}` as Parameters<typeof t>[0]);
+
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(AGENT_TEMPLATES[0].id);
+  const [agentName, setAgentName] = useState<string>(AGENT_TEMPLATES[0].name);
+  const [agentEmoji, setAgentEmoji] = useState<string>(AGENT_TEMPLATES[0].emoji);
+  const [creature, setCreature] = useState<string>(tplKey(AGENT_TEMPLATES[0].keyPrefix, 'creature'));
+  const [vibe, setVibe] = useState<string>(tplKey(AGENT_TEMPLATES[0].keyPrefix, 'vibe'));
+  const [strengths, setStrengths] = useState<string>(tplKey(AGENT_TEMPLATES[0].keyPrefix, 'strengths'));
+  const [boundaries, setBoundaries] = useState<string>(tplKey(AGENT_TEMPLATES[0].keyPrefix, 'boundaries'));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const selectTemplate = useCallback(
+    (tpl: (typeof AGENT_TEMPLATES)[number]) => {
+      setSelectedTemplate(tpl.id);
+      setAgentName(tpl.name);
+      setAgentEmoji(tpl.emoji);
+      setCreature(tplKey(tpl.keyPrefix, 'creature'));
+      setVibe(tplKey(tpl.keyPrefix, 'vibe'));
+      setStrengths(tplKey(tpl.keyPrefix, 'strengths'));
+      setBoundaries(tplKey(tpl.keyPrefix, 'boundaries'));
+    },
+    [t],
+  );
 
   const handleNext = useCallback(async () => {
     setSaving(true);
@@ -790,13 +818,32 @@ const Step3AgentSetup = ({
           identity: { ...agent.identity, emoji: agentEmoji || agent.identity.emoji },
         });
       }
+
+      // Write identity to IDENTITY.md workspace file using user-editable values
+      const identityContent = `# IDENTITY.md - Who Am I?
+
+- **Name:** ${agentName.trim()}
+- **Creature:** ${creature}
+- **Vibe:** ${vibe}
+- **Emoji:** ${agentEmoji}
+
+## Profile
+- **Strengths:** ${strengths}
+- **Boundaries:** ${boundaries}
+`;
+      const files = await listWorkspaceFiles('main');
+      const identityFile = files.find(f => f.name === 'IDENTITY.md');
+      if (identityFile) {
+        await updateWorkspaceFile(identityFile.id, { content: identityContent });
+      }
+
       onNext();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('firstRun_saveFailed'));
     } finally {
       setSaving(false);
     }
-  }, [agentName, agentEmoji, onNext, t]);
+  }, [agentName, agentEmoji, creature, vibe, strengths, boundaries, onNext, t]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -804,7 +851,7 @@ const Step3AgentSetup = ({
         <CardTitle className="text-xl">{t('firstRun_step3Title')}</CardTitle>
         <CardDescription>{t('firstRun_step3Description')}</CardDescription>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {error && (
           <div className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
             {error}
@@ -812,26 +859,86 @@ const Step3AgentSetup = ({
         )}
 
         <div className="grid gap-2">
-          <Label htmlFor="setup-agent-name">{t('firstRun_agentName')}</Label>
-          <Input
-            data-testid="setup-agent-name"
-            id="setup-agent-name"
-            onChange={e => setAgentName(e.target.value)}
-            placeholder="Main Agent"
-            value={agentName}
-          />
+          <Label>{t('firstRun_agentTemplate')}</Label>
+          <Select
+            value={selectedTemplate}
+            onValueChange={v => {
+              const tpl = AGENT_TEMPLATES.find(tp => tp.id === v);
+              if (tpl) selectTemplate(tpl);
+            }}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AGENT_TEMPLATES.map(tpl => (
+                <SelectItem key={tpl.id} value={tpl.id}>
+                  {tpl.emoji} {tpl.name} — {t(`${tpl.keyPrefix}_vibe` as Parameters<typeof t>[0])}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="setup-agent-emoji">{t('firstRun_agentEmoji')}</Label>
-          <Input
-            className="w-20 text-center text-xl"
-            data-testid="setup-agent-emoji"
-            id="setup-agent-emoji"
-            maxLength={2}
-            onChange={e => setAgentEmoji(e.target.value)}
-            value={agentEmoji}
-          />
+        <div className="grid grid-cols-[1fr_80px] gap-2">
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-name">{t('firstRun_agentName')}</Label>
+            <Input
+              data-testid="setup-agent-name"
+              id="setup-agent-name"
+              onChange={e => setAgentName(e.target.value)}
+              placeholder="Main Agent"
+              value={agentName}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-emoji">{t('firstRun_agentEmoji')}</Label>
+            <Input
+              className="text-center text-xl"
+              data-testid="setup-agent-emoji"
+              id="setup-agent-emoji"
+              maxLength={2}
+              onChange={e => setAgentEmoji(e.target.value)}
+              value={agentEmoji}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-creature">{t('firstRun_agentCreature')}</Label>
+            <Input
+              id="setup-agent-creature"
+              onChange={e => setCreature(e.target.value)}
+              value={creature}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-vibe">{t('firstRun_agentVibe')}</Label>
+            <Input
+              id="setup-agent-vibe"
+              onChange={e => setVibe(e.target.value)}
+              value={vibe}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-strengths">{t('firstRun_agentStrengths')}</Label>
+            <Input
+              id="setup-agent-strengths"
+              onChange={e => setStrengths(e.target.value)}
+              value={strengths}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="setup-agent-boundaries">{t('firstRun_agentBoundaries')}</Label>
+            <Input
+              id="setup-agent-boundaries"
+              onChange={e => setBoundaries(e.target.value)}
+              value={boundaries}
+            />
+          </div>
         </div>
 
         <div className="mt-auto flex items-center justify-between">
@@ -1116,10 +1223,10 @@ const FirstRunSetup = ({ onComplete }: FirstRunSetupProps) => {
             <StepFirefoxPermissions onBack={() => setStep(1)} onNext={() => setStep(3)} t={t} />
           )}
           {step === 2 + offset && (
-            <Step2ChannelSetup onBack={() => setStep(1 + offset)} onNext={() => setStep(3 + offset)} t={t} />
+            <Step3AgentSetup onBack={() => setStep(1 + offset)} onNext={() => setStep(3 + offset)} t={t} />
           )}
           {step === 3 + offset && (
-            <Step3AgentSetup onBack={() => setStep(2 + offset)} onNext={() => setStep(4 + offset)} t={t} />
+            <Step2ChannelSetup onBack={() => setStep(2 + offset)} onNext={() => setStep(4 + offset)} t={t} />
           )}
           {step === 4 + offset && (
             <Step4ToolsSetup onBack={() => setStep(3 + offset)} onNext={() => setStep(5 + offset)} t={t} />

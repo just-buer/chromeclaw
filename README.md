@@ -3,6 +3,7 @@
 A lightweight [OpenClaw](https://github.com/openclaw)-inspired AI agent running entirely in the Chrome browser sandbox — with multi-provider LLM support, messaging channels (WhatsApp, Telegram), voice (TTS/STT), memory, agents, and browser automation.
 
 [![Available in the Chrome Web Store](https://img.shields.io/chrome-web-store/v/lnahopfgnfhcfchffbckmbbkopcmojme?style=for-the-badge&logo=googlechrome&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme)
+[![Available on Firefox Add-ons](https://img.shields.io/badge/Firefox%20Add--ons-Available-FF7139?style=for-the-badge&logo=firefoxbrowser)](https://addons.mozilla.org/addon/chromeclaw/)
 
 ## Overview
 
@@ -135,6 +136,10 @@ pnpm build
 ### Install from Chrome Web Store
 
 Install ChromeClaw directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme) — no build step required.
+
+### Install from Firefox Add-ons
+
+Install ChromeClaw for Firefox from [Mozilla Add-ons](https://addons.mozilla.org/addon/chromeclaw/) — no build step required.
 
 ### Load from Source
 
