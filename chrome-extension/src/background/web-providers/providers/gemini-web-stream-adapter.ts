@@ -69,7 +69,10 @@ const extractGeminiText = (parsed: unknown): string | null => {
 
     const textArr = firstCandidate[1];
     if (Array.isArray(textArr) && textArr.length > 0) {
-      return textArr.join('');
+      const text = textArr.join('');
+      // Gemini escapes Markdown-special characters with backslashes; strip them
+      // so XML tool-call tags and other structured content parse correctly.
+      return text.replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1');
     }
     return null;
   } catch {

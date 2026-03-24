@@ -529,13 +529,13 @@ importers:
       '@extension/skills':
         specifier: workspace:*
         version: link:../skills
+      '@extension/storage':
+        specifier: workspace:*
+        version: link:../storage
       react-error-boundary:
         specifier: ^6.0.0
         version: 6.0.0(react@19.1.1)
     devDependencies:
-      '@extension/storage':
-        specifier: workspace:*
-        version: link:../storage
       '@extension/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig

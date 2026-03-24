@@ -384,6 +384,38 @@ describe('createXmlTagParser', () => {
     ]);
   });
 
+  it('handles </think> split across feed() calls', () => {
+    const parser = createXmlTagParser();
+
+    // First chunk ends mid-closing-tag: "<think>\n</"
+    const e1 = parser.feed('<think>\n</');
+    expect(e1).toEqual([{ type: 'thinking_start' }]);
+
+    // Second chunk completes the closing tag and has a tool_call after it
+    const e2 = parser.feed('think><tool_call id="abc" name="browser">{"action":"tabs"}</tool_call>');
+    expect(e2).toEqual([
+      { type: 'thinking_delta', text: '\n' },
+      { type: 'thinking_end' },
+      { type: 'tool_call', id: 'abc', name: 'browser', arguments: { action: 'tabs' } },
+    ]);
+  });
+
+  it('handles </think> split with only < retained', () => {
+    const parser = createXmlTagParser();
+
+    const e1 = parser.feed('<think>reasoning<');
+    expect(e1).toEqual([
+      { type: 'thinking_start' },
+      { type: 'thinking_delta', text: 'reasoning' },
+    ]);
+
+    const e2 = parser.feed('/think>done');
+    expect(e2).toEqual([
+      { type: 'thinking_end' },
+      { type: 'text', text: 'done' },
+    ]);
+  });
+
   it('does not retain non-matching < in middle of text', () => {
     const parser = createXmlTagParser();
 
