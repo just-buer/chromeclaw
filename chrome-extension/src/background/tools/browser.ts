@@ -1,6 +1,7 @@
-import { cdpSend } from './cdp';
+import { cdpSend, cdpSendWithReattach } from './cdp';
 import { sanitizeImage } from './image-sanitization';
 import { IS_FIREFOX } from '@extension/env';
+import { createLogger } from '../logging/logger-buffer';
 import { Type } from '@sinclair/typebox';
 import type { SanitizedImage } from './image-sanitization';
 import type { ToolRegistration, ToolResult } from './tool-registration';
@@ -64,6 +65,8 @@ const browserSchema = Type.Object({
 });
 
 type BrowserArgs = Static<typeof browserSchema>;
+
+const browserLog = createLogger('browser');
 
 /** Structured result returned by the screenshot action */
 interface ScreenshotResult {
@@ -156,8 +159,9 @@ const getTabOrigin = async (tabId: number): Promise<string> => {
   return '';
 };
 
-const doAttach = async (tabId: number): Promise<string | null> => {
+const tryAttach = async (tabId: number): Promise<string | null> => {
   const session = getOrCreateSession(tabId);
+  browserLog.debug('tryAttach', { tabId });
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -172,20 +176,17 @@ const doAttach = async (tabId: number): Promise<string | null> => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('Another debugger is already attached')) {
+      browserLog.debug('Another debugger already attached, reusing', { tabId });
       session.attached = true;
       return null;
     }
-    const errorMsg = `Cannot attach debugger to this tab: ${msg}. This site blocks debugger access. Use browser content action or execute_javascript with tabId instead. Do NOT retry debugger for this tab.`;
-    // Cache the failure
-    const origin = await getTabOrigin(tabId);
-    attachFailureCache.set(tabId, { error: errorMsg, timestamp: Date.now(), origin });
-    return errorMsg;
+    browserLog.warn('Attach failed', { tabId, error: msg });
+    return msg;
   }
 
   session.attached = true;
-
-  // Clear any cached failure on successful attach
   attachFailureCache.delete(tabId);
+  browserLog.info('Debugger attached', { tabId });
 
   // Enable domains
   await cdpSend(tabId, 'Runtime.enable');
@@ -196,9 +197,50 @@ const doAttach = async (tabId: number): Promise<string | null> => {
   return null;
 };
 
+const doAttach = async (tabId: number): Promise<string | null> => {
+  // First attempt
+  const firstErr = await tryAttach(tabId);
+  if (!firstErr) return null;
+  browserLog.info('First attach failed, detaching and retrying', { tabId, error: firstErr });
+
+  // Detach and retry once — handles stale debugger state after tab reload/navigation
+  try {
+    await new Promise<void>(resolve => {
+      chrome.debugger.detach({ tabId }, () => {
+        chrome.runtime.lastError; // consume error
+        resolve();
+      });
+    });
+    cleanupSession(tabId);
+  } catch {
+    // detach failed — ignore
+  }
+
+  const retryErr = await tryAttach(tabId);
+  if (!retryErr) return null;
+
+  // Both attempts failed — cache and return error
+  const errorMsg = `Cannot attach debugger to this tab: ${retryErr}. This site blocks debugger access. Use browser content action or execute_javascript with tabId instead. Do NOT retry debugger for this tab.`;
+  const origin = await getTabOrigin(tabId);
+  attachFailureCache.set(tabId, { error: errorMsg, timestamp: Date.now(), origin });
+  return errorMsg;
+};
+
 const ensureAttached = async (tabId: number): Promise<string | null> => {
   const session = getOrCreateSession(tabId);
-  if (session.attached) return null;
+  if (session.attached) {
+    // Verify the connection is still alive — session.attached may be stale
+    // after extension reload or if the debugger was detached externally.
+    try {
+      await cdpSend(tabId, 'Runtime.evaluate', { expression: '1' });
+      return null;
+    } catch (err) {
+      // Connection is dead — reset and re-attach below
+      browserLog.warn('Stale debugger session detected, re-attaching', { tabId, error: String(err) });
+      session.attached = false;
+      attachFailureCache.delete(tabId);
+    }
+  }
 
   // Check attach failure cache
   const cached = attachFailureCache.get(tabId);
@@ -678,7 +720,7 @@ const walkNode = (node: CDPNode, depth: number, ctx: SnapshotContext): void => {
 const buildSnapshot = async (tabId: number): Promise<string> => {
   const session = getOrCreateSession(tabId);
 
-  const { root } = await cdpSend<{ root: CDPNode }>(tabId, 'DOM.getDocument', {
+  const { root } = await cdpSendWithReattach<{ root: CDPNode }>(tabId, 'DOM.getDocument', {
     depth: -1,
     pierce: true,
   });
@@ -774,9 +816,6 @@ const handleNavigate = async (args: BrowserArgs): Promise<string> => {
     await ensureTabActive(args.tabId);
   }
 
-  const attachErr = await ensureAttached(args.tabId);
-  if (attachErr) return `Error: ${attachErr}`;
-
   // Clear stale refs before navigation — even if load times out, old refs are invalid
   const navSession = getOrCreateSession(args.tabId);
   navSession.refMap.clear();
@@ -784,10 +823,22 @@ const handleNavigate = async (args: BrowserArgs): Promise<string> => {
   // Clear attach failure cache — navigation to new page may succeed
   attachFailureCache.delete(args.tabId);
 
+  // Try debugger-based navigation first for full load detection;
+  // fall back to chrome.tabs.update for pages that block debugger access.
+  const attachErr = await ensureAttached(args.tabId);
+  if (attachErr) {
+    // Fallback: use tabs API — works on any page but no load event detection
+    await chrome.tabs.update(args.tabId, { url: args.url });
+    // Wait briefly for navigation to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const tab = await chrome.tabs.get(args.tabId);
+    return `Navigated tab [${args.tabId}] to ${tab.url ?? args.url}. Run "snapshot" to see page content.`;
+  }
+
   const spaNav = isSpaHashRoute(args.url);
   const loadTimeout = spaNav ? 20000 : 15000;
   const loadPromise = waitForLoad(args.tabId, loadTimeout);
-  const navResult = await cdpSend<{ frameId?: string; errorText?: string }>(
+  const navResult = await cdpSendWithReattach<{ frameId?: string; errorText?: string }>(
     args.tabId,
     'Page.navigate',
     { url: args.url },
@@ -816,14 +867,14 @@ const handleContent = async (args: BrowserArgs): Promise<string> => {
 
   const results = await chrome.scripting.executeScript({
     target: { tabId: args.tabId },
-    func: (selector?: string) => {
+    func: (selector: string | null) => {
       if (selector) {
         const el = document.querySelector(selector);
         return el ? (el as HTMLElement).innerText : `No element found for selector: ${selector}`;
       }
       return document.body.innerText;
     },
-    args: [args.selector ?? undefined],
+    args: [typeof args.selector === 'string' ? args.selector : null],
   });
 
   let text = results?.[0]?.result ?? '';
@@ -868,12 +919,12 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
 
   if (args.fullPage) {
     // Get full page metrics
-    const metrics = await cdpSend<{
+    const metrics = await cdpSendWithReattach<{
       contentSize: { width: number; height: number };
     }>(args.tabId, 'Page.getLayoutMetrics');
     const { width, height } = metrics.contentSize;
 
-    await cdpSend(args.tabId, 'Emulation.setDeviceMetricsOverride', {
+    await cdpSendWithReattach(args.tabId, 'Emulation.setDeviceMetricsOverride', {
       width: Math.ceil(width),
       height: Math.ceil(height),
       deviceScaleFactor: 1,
@@ -884,7 +935,7 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
   }
 
   try {
-    const result = await cdpSend<{ data: string }>(args.tabId, 'Page.captureScreenshot', params);
+    const result = await cdpSendWithReattach<{ data: string }>(args.tabId, 'Page.captureScreenshot', params);
 
     // Resize and compress the screenshot
     let sanitized: SanitizedImage | null;
@@ -907,7 +958,7 @@ const handleScreenshot = async (args: BrowserArgs): Promise<string | ScreenshotR
     };
   } finally {
     if (args.fullPage) {
-      await cdpSend(args.tabId, 'Emulation.clearDeviceMetricsOverride');
+      await cdpSendWithReattach(args.tabId, 'Emulation.clearDeviceMetricsOverride');
     }
   }
 };
@@ -925,14 +976,14 @@ const handleClick = async (args: BrowserArgs): Promise<string> => {
 
   try {
     // Resolve backend node to a remote object
-    const { object } = await cdpSend<{ object: { objectId: string } }>(
+    const { object } = await cdpSendWithReattach<{ object: { objectId: string } }>(
       args.tabId,
       'DOM.resolveNode',
       { backendNodeId: entry.backendNodeId },
     );
 
     // Scroll into view and click
-    await cdpSend(args.tabId, 'Runtime.callFunctionOn', {
+    await cdpSendWithReattach(args.tabId, 'Runtime.callFunctionOn', {
       objectId: object.objectId,
       functionDeclaration: `function() {
         this.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -945,7 +996,7 @@ const handleClick = async (args: BrowserArgs): Promise<string> => {
   } catch (err: unknown) {
     // Fallback: try coordinate-based click via box model
     try {
-      const { model } = await cdpSend<{
+      const { model } = await cdpSendWithReattach<{
         model: { content: number[] };
       }>(args.tabId, 'DOM.getBoxModel', { backendNodeId: entry.backendNodeId });
 
@@ -954,14 +1005,14 @@ const handleClick = async (args: BrowserArgs): Promise<string> => {
       const cy = (y1 + y4) / 2;
 
       await ensureTabActive(args.tabId);
-      await cdpSend(args.tabId, 'Input.dispatchMouseEvent', {
+      await cdpSendWithReattach(args.tabId, 'Input.dispatchMouseEvent', {
         type: 'mousePressed',
         x: cx,
         y: cy,
         button: 'left',
         clickCount: 1,
       });
-      await cdpSend(args.tabId, 'Input.dispatchMouseEvent', {
+      await cdpSendWithReattach(args.tabId, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased',
         x: cx,
         y: cy,
@@ -990,14 +1041,14 @@ const handleType = async (args: BrowserArgs): Promise<string> => {
   if (!entry) return `Error: Ref [${args.ref}] not found. Run "snapshot" to refresh refs.`;
 
   try {
-    const { object } = await cdpSend<{ object: { objectId: string } }>(
+    const { object } = await cdpSendWithReattach<{ object: { objectId: string } }>(
       args.tabId,
       'DOM.resolveNode',
       { backendNodeId: entry.backendNodeId },
     );
 
     // Focus the element and clear existing value, dispatching input event for framework compat
-    await cdpSend(args.tabId, 'Runtime.callFunctionOn', {
+    await cdpSendWithReattach(args.tabId, 'Runtime.callFunctionOn', {
       objectId: object.objectId,
       functionDeclaration: `function() {
         this.focus();
@@ -1011,7 +1062,7 @@ const handleType = async (args: BrowserArgs): Promise<string> => {
 
     // Insert text — tab must be active for Input.insertText to work
     await ensureTabActive(args.tabId);
-    await cdpSend(args.tabId, 'Input.insertText', { text: args.text });
+    await cdpSendWithReattach(args.tabId, 'Input.insertText', { text: args.text });
 
     return `Typed "${args.text.length > 50 ? args.text.slice(0, 50) + '...' : args.text}" into element [${args.ref}].`;
   } catch (err: unknown) {
@@ -1027,7 +1078,7 @@ const handleEvaluate = async (args: BrowserArgs): Promise<string> => {
   const attachErr = await ensureAttached(args.tabId);
   if (attachErr) return `Error: ${attachErr}`;
 
-  const result = await cdpSend<{
+  const result = await cdpSendWithReattach<{
     result: { type: string; value?: unknown; description?: string; subtype?: string };
     exceptionDetails?: { text: string; exception?: { description?: string } };
   }>(args.tabId, 'Runtime.evaluate', {
@@ -1084,6 +1135,7 @@ const handleNetwork = async (args: BrowserArgs): Promise<string> => {
 // ---------------------------------------------------------------------------
 
 const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotResult> => {
+  browserLog.debug('executeBrowser', { action: args.action, tabId: args.tabId });
   // Coerce tabId/ref to numbers — LLMs sometimes emit string values and the
   // browser extension CSP prevents AJV type coercion from running.
   if (args.tabId != null && typeof args.tabId !== 'number') {
