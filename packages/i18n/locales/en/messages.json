@@ -878,6 +878,99 @@
   "tab_mcp": {
     "message": "MCP Servers"
   },
+  "tab_community": {
+    "message": "Community"
+  },
+  "firstRun_agentCreature": {
+    "message": "Creature"
+  },
+  "firstRun_agentVibe": {
+    "message": "Vibe"
+  },
+  "firstRun_agentStrengths": {
+    "message": "Strengths"
+  },
+  "firstRun_agentBoundaries": {
+    "message": "Boundaries"
+  },
+  "firstRun_agentTemplate": {
+    "message": "Choose a persona"
+  },
+  "agent_tpl_claw_creature": {
+    "message": "Browser-resident task agent"
+  },
+  "agent_tpl_claw_vibe": {
+    "message": "Resourceful, careful, capable"
+  },
+  "agent_tpl_claw_bestFor": {
+    "message": "General use"
+  },
+  "agent_tpl_claw_strengths": {
+    "message": "Balanced judgment, strong tool use, pragmatic execution"
+  },
+  "agent_tpl_claw_boundaries": {
+    "message": "Asks before risky or destructive actions"
+  },
+  "agent_tpl_sage_creature": {
+    "message": "Thoughtful guide"
+  },
+  "agent_tpl_sage_vibe": {
+    "message": "Calm, reflective, wise"
+  },
+  "agent_tpl_sage_bestFor": {
+    "message": "Decision support, coaching, tradeoff discussions"
+  },
+  "agent_tpl_sage_strengths": {
+    "message": "Good questions, balanced framing"
+  },
+  "agent_tpl_sage_boundaries": {
+    "message": "Respects user autonomy; doesn't preach"
+  },
+  "agent_tpl_slate_creature": {
+    "message": "Embedded systems ghost"
+  },
+  "agent_tpl_slate_vibe": {
+    "message": "Direct, dry, efficient"
+  },
+  "agent_tpl_slate_bestFor": {
+    "message": "Coding, implementation, CLI-style tasks"
+  },
+  "agent_tpl_slate_strengths": {
+    "message": "Minimal verbosity, scoped execution"
+  },
+  "agent_tpl_slate_boundaries": {
+    "message": "Doesn't expand scope unless asked"
+  },
+  "greeting_hello": {
+    "message": "Hello there!"
+  },
+  "greeting_help": {
+    "message": "How can I help you today?"
+  },
+  "community_title": {
+    "message": "Community"
+  },
+  "community_description": {
+    "message": "Join our community to share feedback, get help, and discuss ideas with other users."
+  },
+  "community_discordTitle": {
+    "message": "Discord Server"
+  },
+  "community_discordDescription": {
+    "message": "Chat with the community, report bugs, request features, and get help from other ChromeClaw users."
+  },
+  "community_joinDiscord": {
+    "message": "Join Discord"
+  },
+  "community_rateTitle": {
+    "message": "Rate ChromeClaw"
+  },
+  "community_rateDescription": {
+    "message": "Enjoying ChromeClaw? Leave a review on the Chrome Web Store to help others discover it."
+  },
+  "community_leaveReview": {
+    "message": "Leave a Review"
+  },
   "whatsapp_title": {
     "message": "WhatsApp"
   },

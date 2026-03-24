@@ -13,6 +13,7 @@ import {
   MessagesSquareIcon,
   ServerIcon,
   ShieldAlertIcon,
+  MessageCircleIcon,
 } from 'lucide-react';
 
 type ConfigTabId =
@@ -28,7 +29,8 @@ type ConfigTabId =
   | 'usage'
   | 'logs'
   | 'mcp'
-  | 'approval-rules';
+  | 'approval-rules'
+  | 'community';
 
 type ConfigTabGroup = {
   label: string;
@@ -62,6 +64,7 @@ const getConfigTabGroups = (): ConfigTabGroup[] => [
       { id: 'approval-rules', label: '审批规则', icon: ShieldAlertIcon },
       { id: 'actions', label: t('tab_actions'), icon: LightbulbIcon },
       { id: 'logs', label: t('tab_logs'), icon: ScrollTextIcon },
+      { id: 'community', label: t('tab_community'), icon: MessageCircleIcon },
     ],
   },
 ];

@@ -17,6 +17,7 @@ import { WhatsAppConfig } from './whatsapp-config';
 import { McpConfig } from './mcp-config';
 import { ApprovalRulesConfig } from './approval-rules-config';
 
+import { CommunityConfig } from './community-config';
 
 const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTabId; onOpenSession?: (chatId: string) => void }) => (
   <>
@@ -45,6 +46,7 @@ const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTab
     {activeTab === 'sessions' && <SessionManager onOpenSession={onOpenSession} />}
     {activeTab === 'usage' && <UsageDashboard />}
     {activeTab === 'logs' && <LogViewer />}
+    {activeTab === 'community' && <CommunityConfig />}
   </>
 );
 
