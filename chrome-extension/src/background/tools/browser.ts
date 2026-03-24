@@ -1,4 +1,5 @@
 import { cdpSend, cdpSendWithReattach } from './cdp';
+import { executeBrowserFirefox } from './browser-firefox';
 import { sanitizeImage } from './image-sanitization';
 import { IS_FIREFOX } from '@extension/env';
 import { createLogger } from '../logging/logger-buffer';
@@ -901,7 +902,7 @@ const handleSnapshot = async (args: BrowserArgs): Promise<string> => {
   const attachErr = await ensureAttached(args.tabId);
   if (attachErr) {
     browserLog.warn('handleSnapshot: CDP attach failed, falling back to scripting snapshot', { tabId: args.tabId, error: attachErr });
-    const { executeBrowserFirefox } = await import('./browser-firefox');
+    
     const fallback = await executeBrowserFirefox({ ...args, action: 'snapshot' });
     if (typeof fallback === 'string' && !fallback.startsWith('Error:')) {
       return fallback;
@@ -917,7 +918,7 @@ const handleSnapshot = async (args: BrowserArgs): Promise<string> => {
     // Debugger may have been immediately detached — fall back to scripting snapshot
     const msg = snapshotErr instanceof Error ? snapshotErr.message : String(snapshotErr);
     browserLog.warn('handleSnapshot: buildSnapshot failed, falling back to scripting snapshot', { tabId: args.tabId, error: msg });
-    const { executeBrowserFirefox } = await import('./browser-firefox');
+    
     const fallback = await executeBrowserFirefox({ ...args, action: 'snapshot' });
     if (typeof fallback === 'string' && !fallback.startsWith('Error:')) {
       return fallback;
@@ -1180,7 +1181,6 @@ const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotRes
 
   // Firefox: delegate to scripting-based implementation (no chrome.debugger)
   if (IS_FIREFOX) {
-    const { executeBrowserFirefox } = await import('./browser-firefox');
     return executeBrowserFirefox(args);
   }
 
@@ -1228,7 +1228,7 @@ const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotRes
     if (isDebuggerError) {
       browserLog.info('Falling back to scripting-based implementation', { action: args.action, tabId: args.tabId });
       try {
-        const { executeBrowserFirefox } = await import('./browser-firefox');
+        
         const fallback = await executeBrowserFirefox(args);
         if (typeof fallback === 'string' && fallback.startsWith('Error:')) {
           return fallback;
