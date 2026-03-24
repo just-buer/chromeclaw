@@ -228,6 +228,7 @@ const doAttach = async (tabId: number): Promise<string | null> => {
 
 const ensureAttached = async (tabId: number): Promise<string | null> => {
   const session = getOrCreateSession(tabId);
+  browserLog.trace('ensureAttached', { tabId, sessionAttached: session.attached });
   if (session.attached) {
     // Verify the connection is still alive — session.attached may be stale
     // after extension reload or if the debugger was detached externally.
@@ -825,16 +826,17 @@ const handleNavigate = async (args: BrowserArgs): Promise<string> => {
 
   // Try debugger-based navigation first for full load detection;
   // fall back to chrome.tabs.update for pages that block debugger access.
+  browserLog.debug('handleNavigate: attaching', { tabId: args.tabId, url: args.url });
   const attachErr = await ensureAttached(args.tabId);
   if (attachErr) {
-    // Fallback: use tabs API — works on any page but no load event detection
+    browserLog.info('handleNavigate: attach failed, falling back to tabs API', { tabId: args.tabId, error: attachErr });
     await chrome.tabs.update(args.tabId, { url: args.url });
-    // Wait briefly for navigation to start
     await new Promise(resolve => setTimeout(resolve, 2000));
     const tab = await chrome.tabs.get(args.tabId);
     return `Navigated tab [${args.tabId}] to ${tab.url ?? args.url}. Run "snapshot" to see page content.`;
   }
 
+  browserLog.debug('handleNavigate: using CDP Page.navigate', { tabId: args.tabId });
   const spaNav = isSpaHashRoute(args.url);
   const loadTimeout = spaNav ? 20000 : 15000;
   const loadPromise = waitForLoad(args.tabId, loadTimeout);
@@ -865,6 +867,7 @@ const handleNavigate = async (args: BrowserArgs): Promise<string> => {
 const handleContent = async (args: BrowserArgs): Promise<string> => {
   if (args.tabId == null) return 'Error: "tabId" is required for the "content" action.';
 
+  browserLog.debug('handleContent: executing script', { tabId: args.tabId, selector: args.selector ?? null });
   const results = await chrome.scripting.executeScript({
     target: { tabId: args.tabId },
     func: (selector: string | null) => {
@@ -887,11 +890,14 @@ const handleContent = async (args: BrowserArgs): Promise<string> => {
 const handleSnapshot = async (args: BrowserArgs): Promise<string> => {
   if (args.tabId == null) return 'Error: "tabId" is required for the "snapshot" action.';
 
+  browserLog.debug('handleSnapshot: attaching', { tabId: args.tabId });
   const attachErr = await ensureAttached(args.tabId);
   if (attachErr) {
+    browserLog.warn('handleSnapshot: attach failed', { tabId: args.tabId, error: attachErr });
     return `Error: Cannot capture this page — the site blocks programmatic access (common with Google, banking, and enterprise apps). Detail: ${attachErr}. Try using execute_javascript with tabId to run JS in the page context instead, or ask the user to describe what they see.`;
   }
 
+  browserLog.debug('handleSnapshot: building snapshot', { tabId: args.tabId });
   let snapshot = await buildSnapshot(args.tabId);
 
   // Warn on minimal content — use total snapshot length as a simple heuristic
@@ -1186,6 +1192,7 @@ const executeBrowser = async (args: BrowserArgs): Promise<string | ScreenshotRes
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    browserLog.error('executeBrowser error', { action: args.action, tabId: args.tabId, error: msg });
     return `Error: ${msg}`;
   }
 };
