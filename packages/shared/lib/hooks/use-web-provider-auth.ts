@@ -26,44 +26,15 @@ export function useWebProviderAuth(opts: UseWebProviderAuthOptions): UseWebProvi
   const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check web auth status when provider or webProviderId changes
+  // Reset status when provider or webProviderId changes — never auto-check.
+  // User must click "Login" to verify login status.
   useEffect(() => {
     if (provider !== 'web' || !webProviderId) {
       setStatus('unknown');
-      return;
+    } else {
+      setStatus('not-logged-in');
     }
-    const wp = WEB_PROVIDER_OPTIONS.find(p => p.value === webProviderId);
-    if (!wp) {
-      setStatus('unknown');
-      return;
-    }
-
-    setStatus('checking');
-    (async () => {
-      try {
-        // Check stored credentials first
-        const creds = await webCredentialsStorage.get();
-        if (creds[webProviderId]) {
-          setStatus('logged-in');
-          return;
-        }
-        // Check cookies directly (skip for localStorage-based providers where
-        // session indicators won't be in cookies — stored credentials above are
-        // the canonical check for those).
-        if ('checkLocalStorage' in wp && wp.checkLocalStorage) {
-          setStatus('not-logged-in');
-          return;
-        }
-        const cookies = await chrome.cookies.getAll({ domain: wp.cookieDomain });
-        const cookieMap = Object.fromEntries(
-          cookies.map((c: chrome.cookies.Cookie) => [c.name, c.value]),
-        );
-        const hasSession = wp.sessionIndicators.some((name: string) => !!cookieMap[name]);
-        setStatus(hasSession ? 'logged-in' : 'not-logged-in');
-      } catch {
-        setStatus('not-logged-in');
-      }
-    })();
+    setError(null);
   }, [provider, webProviderId, recheckKey]);
 
   const login = useCallback(async () => {
@@ -73,10 +44,14 @@ export function useWebProviderAuth(opts: UseWebProviderAuthOptions): UseWebProvi
     setLoginLoading(true);
     setError(null);
     try {
-      const tab = await chrome.tabs.create({ url: wp.loginUrl, active: false });
+      // Always open the provider's login page so the user can log in / refresh their session
+      const tab = await chrome.tabs.create({ url: wp.loginUrl, active: true });
       const tabId = tab.id!;
 
-      // Poll for session cookies
+      // Give the user time to see the login page before we start checking cookies.
+      // Without this delay, existing cookies (e.g. Google account) would be detected
+      // immediately and the tab would close before the user sees anything.
+      const MIN_WAIT_MS = 5_000;
       const startTime = Date.now();
       const TIMEOUT = 5 * 60 * 1000;
       const INTERVAL = 2000;
@@ -87,6 +62,11 @@ export function useWebProviderAuth(opts: UseWebProviderAuthOptions): UseWebProvi
           await chrome.tabs.get(tabId);
         } catch {
           return false;
+        }
+
+        // Don't check cookies until the minimum wait has elapsed
+        if (Date.now() - startTime < MIN_WAIT_MS) {
+          return new Promise(resolve => setTimeout(() => resolve(poll()), INTERVAL));
         }
 
         const cookies = await chrome.cookies.getAll({ domain: wp.cookieDomain });

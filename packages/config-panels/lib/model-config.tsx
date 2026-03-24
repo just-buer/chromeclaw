@@ -243,6 +243,19 @@ const ModelConfig = () => {
     setDialogOpen(true);
   }, []);
 
+  // ── Web provider auth state (must be before handleSave which references webAuthStatus) ──
+  const {
+    status: webAuthStatus,
+    loginLoading: webLoginLoading,
+    error: webAuthError,
+    login: handleWebLogin,
+    logout: handleWebLogout,
+  } = useWebProviderAuth({
+    provider: editForm.provider,
+    webProviderId: editForm.webProviderId,
+    recheckKey: dialogOpen,
+  });
+
   const handleFormChange = useCallback((key: keyof ModelFormData, value: string | boolean) => {
     setEditForm(prev => {
       const next = { ...prev, [key]: value };
@@ -314,6 +327,10 @@ const ModelConfig = () => {
       setFormError(validationError);
       return;
     }
+    if (editForm.provider === 'web' && webAuthStatus !== 'logged-in') {
+      setFormError('You must log in to the web provider before saving.');
+      return;
+    }
 
     const webProviderDefaults =
       editForm.provider === 'web' && editForm.webProviderId
@@ -352,7 +369,7 @@ const ModelConfig = () => {
     await customModelsStorage.set(updated);
     setModels(updated);
     setDialogOpen(false);
-  }, [editForm, models]);
+  }, [editForm, models, webAuthStatus]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -460,19 +477,6 @@ const ModelConfig = () => {
     },
     [refreshCachedLocalModels],
   );
-
-  // ── Web provider auth state ────────────────────
-  const {
-    status: webAuthStatus,
-    loginLoading: webLoginLoading,
-    error: webAuthError,
-    login: handleWebLogin,
-    logout: handleWebLogout,
-  } = useWebProviderAuth({
-    provider: editForm.provider,
-    webProviderId: editForm.webProviderId,
-    recheckKey: dialogOpen,
-  });
 
   // Relay web auth errors to the form error state
   useEffect(() => {
@@ -728,10 +732,10 @@ const ModelConfig = () => {
                         Logged in
                       </Badge>
                     )}
-                    {webAuthStatus === 'not-logged-in' && (
+                    {(webAuthStatus === 'not-logged-in' || webAuthStatus === 'unknown') && (
                       <Badge variant="outline" className="gap-1 border-orange-500 text-orange-600">
                         <XCircleIcon className="size-3" />
-                        Not logged in
+                        Click Login to check status
                       </Badge>
                     )}
                     {webAuthStatus === 'logged-in' ? (
@@ -754,6 +758,11 @@ const ModelConfig = () => {
                       </Button>
                     )}
                   </div>
+                  {webLoginLoading && (
+                    <p className="text-muted-foreground text-xs">
+                      Log in on the opened page. The session will be captured automatically.
+                    </p>
+                  )}
                 </div>
               )}
 

@@ -47,11 +47,23 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         credentials: 'include',
       });
       if (!setupResp.ok) {
+        let errorBody = '';
+        try {
+          errorBody = await setupResp.text();
+          if (errorBody.length > 500) errorBody = errorBody.slice(0, 500);
+        } catch {
+          /* ignore */
+        }
+        const errorDetail = errorBody ? ` — ${errorBody}` : '';
+        const authHint =
+          setupResp.status === 401 || setupResp.status === 403
+            ? ` Please visit ${origin} to verify your account is active and can use this model, then log out and log back in via Settings → Models.`
+            : '';
         window.postMessage(
           {
             type: 'WEB_LLM_ERROR',
             requestId,
-            error: `Setup request failed: HTTP ${setupResp.status}: ${setupResp.statusText}`,
+            error: `Setup request failed: HTTP ${setupResp.status}: ${setupResp.statusText}${errorDetail}${authHint}`,
           },
           origin,
         );
@@ -639,11 +651,15 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         /* ignore */
       }
       const errorDetail = errorBody ? ` — ${errorBody}` : '';
+      const authHint =
+        response.status === 401 || response.status === 403
+          ? ` Please visit ${origin} to verify your account is active and can use this model, then log out and log back in via Settings → Models.`
+          : '';
       window.postMessage(
         {
           type: 'WEB_LLM_ERROR',
           requestId,
-          error: `HTTP ${response.status}: ${response.statusText}${errorDetail}`,
+          error: `HTTP ${response.status}: ${response.statusText}${errorDetail}${authHint}`,
         },
         origin,
       );

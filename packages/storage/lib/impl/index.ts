@@ -13,6 +13,8 @@ export {
 export {
   suggestedActionsStorage,
   defaultSuggestedActions,
+  getDefaultSuggestedActions,
+  isDefaultActions,
   type SuggestedAction,
 } from './suggested-actions-storage.js';
 export { selectedModelStorage } from './selected-model-storage.js';

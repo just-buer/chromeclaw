@@ -1,4 +1,5 @@
-import { suggestedActionsStorage, defaultSuggestedActions } from '@extension/storage';
+import { suggestedActionsStorage, getDefaultSuggestedActions } from '@extension/storage';
+import { getLocale } from '@extension/i18n';
 import {
   Button,
   Card,
@@ -139,7 +140,7 @@ const SuggestedActionsConfig = () => {
   );
 
   const handleReset = useCallback(() => {
-    const next = [...defaultSuggestedActions];
+    const next = [...getDefaultSuggestedActions(getLocale())];
     setActions(next);
     saveImmediate(next);
   }, [saveImmediate]);

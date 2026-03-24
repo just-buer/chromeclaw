@@ -220,6 +220,10 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
       setError('Please select a web provider');
       return;
     }
+    if (isWeb && webAuthStatus !== 'logged-in') {
+      setError('You must log in to the web provider before continuing.');
+      return;
+    }
     if (!isWeb && !modelId.trim()) {
       setError(t('firstRun_modelIdRequired'));
       return;
@@ -264,6 +268,7 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
     supportsTools,
     supportsReasoning,
     webProviderId,
+    webAuthStatus,
     onNext,
     t,
   ]);
@@ -351,10 +356,10 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
                   Logged in
                 </Badge>
               )}
-              {webAuthStatus === 'not-logged-in' && (
+              {(webAuthStatus === 'not-logged-in' || webAuthStatus === 'unknown') && (
                 <Badge variant="outline" className="gap-1 border-orange-500 text-orange-600">
                   <XCircleIcon className="size-3" />
-                  Not logged in
+                  Click Login to check status
                 </Badge>
               )}
               {webAuthStatus === 'logged-in' ? (
@@ -377,6 +382,11 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
                 </Button>
               )}
             </div>
+            {webLoginLoading && (
+              <p className="text-muted-foreground text-xs">
+                Log in on the opened page. The session will be captured automatically.
+              </p>
+            )}
           </div>
         ) : (
           <>

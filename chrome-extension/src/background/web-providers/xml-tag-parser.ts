@@ -216,11 +216,20 @@ const createXmlTagParser = (): {
           buffer = buffer.slice(end + 8); // len('</think>') — always 8 regardless of case
           state = 'text';
         } else {
-          // Stream incrementally
-          if (buffer) {
-            events.push({ type: 'thinking_delta', text: buffer });
+          // Stream incrementally, but retain any partial </think> suffix
+          // so the next feed() can complete the closing tag match.
+          let emitEnd = buffer.length;
+          for (let i = Math.max(0, buffer.length - 8); i < buffer.length; i++) {
+            const suffix = buffer.slice(i);
+            if ('</think>'.startsWith(suffix.toLowerCase())) {
+              emitEnd = i;
+              break;
+            }
           }
-          buffer = '';
+          if (emitEnd > 0) {
+            events.push({ type: 'thinking_delta', text: buffer.slice(0, emitEnd) });
+          }
+          buffer = buffer.slice(emitEnd);
         }
       } else if (state === 'tool_call') {
         // Search in the combined toolCallBuffer + buffer so that a closing tag
