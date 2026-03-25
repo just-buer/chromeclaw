@@ -72,7 +72,14 @@ const extractGeminiText = (parsed: unknown): string | null => {
       const text = textArr.join('');
       // Gemini escapes Markdown-special characters with backslashes; strip them
       // so XML tool-call tags and other structured content parse correctly.
-      return text.replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1');
+      // Also strip auto-linkified markdown URLs [text](url) → text, because
+      // Gemini wraps URLs in markdown links even inside tool-call JSON, which
+      // corrupts the JSON and destabilises cumulative text length (the link
+      // URL may change between chunks, e.g. Google redirect → direct URL,
+      // causing fullText to shrink and preventing later deltas from emitting).
+      return text
+        .replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
     }
     return null;
   } catch {

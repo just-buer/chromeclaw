@@ -551,6 +551,19 @@ const executeToolCalls = async (
       isError = true;
     }
 
+    // Log tool result for debugging
+    const resultText = result.content
+      ?.filter((c: { type: string }) => c.type === 'text')
+      .map((c: { text?: string }) => c.text ?? '')
+      .join('');
+    agentLoopLog.debug('Tool result', {
+      toolName: toolCall.name,
+      toolCallId: toolCall.id,
+      isError,
+      resultLength: resultText?.length ?? 0,
+      resultPreview: resultText ? resultText.slice(0, 300) : '',
+    });
+
     // Record tool result in loop state for progress tracking
     if (toolLoopState) {
       await recordToolCallOutcome(toolLoopState, toolCall.id, result);

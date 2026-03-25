@@ -63,7 +63,11 @@ const geminiWeb: WebProviderDefinition = {
         const text = textArr.join('');
         // Gemini escapes Markdown-special characters with backslashes; strip them
         // so XML tool-call tags and other structured content parse correctly.
-        return text.replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1');
+        // Also strip auto-linkified markdown URLs [text](url) → text (see
+        // gemini-web-stream-adapter.ts for detailed rationale).
+        return text
+          .replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1')
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
       }
       return null;
     } catch {

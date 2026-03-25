@@ -73,6 +73,28 @@ describe('extractGeminiText', () => {
     const chunk = [['wrb.fr', null, 12345]];
     expect(extractGeminiText(chunk)).toBeNull();
   });
+
+  it('strips markdown auto-linked URLs', () => {
+    expect(extractGeminiText(textChunk(
+      'Visit [https://example.com](https://example.com) for details',
+    ))).toBe('Visit https://example.com for details');
+  });
+
+  it('strips markdown URLs with Google redirect in link target', () => {
+    expect(extractGeminiText(textChunk(
+      '[https://news.ycombinator.com](https://www.google.com/search?q=https://news.ycombinator.com)',
+    ))).toBe('https://news.ycombinator.com');
+  });
+
+  it('strips markdown URLs inside tool call JSON', () => {
+    // Gemini text segments contain literal <> (after JSON unescape of \u003c/\u003e),
+    // and the backslash-stripping regex handles \< → <. Here we test the markdown
+    // stripping on text that already has literal angle brackets (post-JSON-parse).
+    const text = '<tool_call id="open" name="browser">{"url":"[https://example.com](https://example.com)"}</tool_call>';
+    expect(extractGeminiText(textChunk(text))).toBe(
+      '<tool_call id="open" name="browser">{"url":"https://example.com"}</tool_call>',
+    );
+  });
 });
 
 describe('createGeminiStreamAdapter', () => {
@@ -177,6 +199,32 @@ describe('createGeminiStreamAdapter', () => {
         parsed: textChunk('think\nreasoning here\n<think>\nSummary\n</think>Hi there!'),
         delta: 'think\nreasoning here\n<think>\nSummary\n</think>Hi there!',
       })).toEqual({ feedText: ' there!' });
+    });
+  });
+
+  describe('markdown link stripping in cumulative text', () => {
+    it('emits correct deltas when Gemini rewrites URLs between chunks', () => {
+      const adapter = createGeminiStreamAdapter();
+
+      // Chunk 1: tool_call opening
+      expect(adapter.processEvent({
+        parsed: textChunk('<tool_call id="o1" name="browser">{"url":"'),
+        delta: null,
+      })).toEqual({ feedText: '<tool_call id="o1" name="browser">{"url":"' });
+
+      // Chunk 2: URL appears as markdown link with Google redirect (longer)
+      // After stripping: bare URL is shorter, so cumulative text still grows
+      expect(adapter.processEvent({
+        parsed: textChunk('<tool_call id="o1" name="browser">{"url":"[https://news.ycombin](https://www.google.com/search?q=https://news.ycombin)'),
+        delta: null,
+      })).toEqual({ feedText: 'https://news.ycombin' });
+
+      // Chunk 3: Gemini rewrites URL to direct link (shorter markdown, but
+      // stripped URL is longer because domain is now complete) + closing tag
+      expect(adapter.processEvent({
+        parsed: textChunk('<tool_call id="o1" name="browser">{"url":"[https://news.ycombinator.com](https://news.ycombinator.com)"}</tool_call>'),
+        delta: null,
+      })).toEqual({ feedText: 'ator.com"}</tool_call>' });
     });
   });
 

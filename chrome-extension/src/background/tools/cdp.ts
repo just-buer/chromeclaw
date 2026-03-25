@@ -57,4 +57,33 @@ const cdpAttach = async (tabId: number): Promise<string | null> => {
   return null;
 };
 
-export { cdpSend, cdpAttach };
+/**
+ * Like cdpSend, but if the command fails with a "not attached" or "detached"
+ * error, re-attaches the debugger once and retries the command.
+ */
+const cdpSendWithReattach = async <T = unknown>(
+  tabId: number,
+  method: string,
+  params?: Record<string, unknown>,
+): Promise<T> => {
+  try {
+    return await cdpSend<T>(tabId, method, params);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.toLowerCase().includes('not attached') && !msg.toLowerCase().includes('detached')) {
+      throw err;
+    }
+    // Try to re-attach and re-enable CDP domains
+    console.warn(`[cdp] ${method} failed on tab ${tabId}: ${msg}. Re-attaching...`);
+    const attachErr = await cdpAttach(tabId);
+    if (attachErr) throw new Error(`Re-attach failed: ${attachErr}`);
+    await cdpSend(tabId, 'Runtime.enable');
+    await cdpSend(tabId, 'Network.enable');
+    await cdpSend(tabId, 'Page.enable');
+    await cdpSend(tabId, 'DOM.enable');
+    console.info(`[cdp] Re-attached to tab ${tabId}, retrying ${method}`);
+    return cdpSend<T>(tabId, method, params);
+  }
+};
+
+export { cdpSend, cdpAttach, cdpSendWithReattach };
