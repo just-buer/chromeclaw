@@ -166,6 +166,10 @@ const getAgentTools = async (opts?: {
           label: ct.name,
           description: ct.description,
           parameters: buildCustomToolSchema(ct.params),
+          requiresApproval:
+            agent?.toolConfig?.requireApprovalTools?.[ct.name] ??
+            config.requireApprovalTools?.[ct.name] ??
+            false,
           execute: async (_toolCallId, params) => {
             const result = await executeCustomTool(ct, params as Record<string, unknown>, agentId);
             return defaultFormatResult(result);

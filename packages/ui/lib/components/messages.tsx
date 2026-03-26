@@ -120,7 +120,16 @@ const Messages = ({
             <SubagentProgressCard key={sa.runId} info={sa} onStop={onStopSubagent} />
           ))}
 
-          {status === 'connecting' && <ThinkingMessage />}
+          {(status === 'connecting' || (() => {
+            if (status !== 'streaming') return false;
+            const lastMsg = messages[messages.length - 1];
+            if (!lastMsg || lastMsg.role !== 'assistant') return false;
+            const parts = lastMsg.parts;
+            if (parts.length === 0) return true;
+            const lastPart = parts[parts.length - 1];
+            return lastPart.type === 'tool-call' &&
+              (lastPart.state === 'output-available' || lastPart.state === 'output-error');
+          })()) && <ThinkingMessage />}
 
           <div className="min-h-[24px] min-w-[24px] shrink-0" ref={endRef} />
         </div>

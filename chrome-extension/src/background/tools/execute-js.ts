@@ -168,6 +168,10 @@ const stripLeadingComments = (code: string): string => {
 /**
  * If `code` has no top-level `return` and starts with `(` (e.g. an IIFE),
  * prepend `return ` so the value is captured by the outer async wrapper.
+ *
+ * Also handles named function declarations and arrow function assignments:
+ * if the code body is a single top-level function definition, automatically
+ * appends `return <name>(args);` so developers don't need to manually call it.
  */
 const maybeAutoReturn = (code: string): string => {
   const body = stripLeadingComments(code).trimStart();
@@ -177,6 +181,16 @@ const maybeAutoReturn = (code: string): string => {
   if (body.startsWith('(')) {
     const offset = code.length - body.length;
     return code.slice(0, offset) + 'return ' + body;
+  }
+  // Named function declaration: `async function name(` or `function name(`
+  const funcMatch = body.match(/^(?:async\s+)?function\s+(\w+)\s*\(/);
+  if (funcMatch) {
+    return code + `\nreturn ${funcMatch[1]}(args);`;
+  }
+  // Arrow / expression assignment: `const name = ` or `let name = ` or `var name = `
+  const arrowMatch = body.match(/^(?:const|let|var)\s+(\w+)\s*=/);
+  if (arrowMatch) {
+    return code + `\nreturn ${arrowMatch[1]}(args);`;
   }
   return code;
 };

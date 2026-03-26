@@ -557,6 +557,50 @@
       }
     }
   },
+  "skill_exportZip": {
+    "message": "导出为 Zip"
+  },
+  "skill_exported": {
+    "message": "技能已导出：$SKILL_NAME$",
+    "placeholders": {
+      "skill_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_exportZip": {
+    "message": "导出为 Zip"
+  },
+  "customTool_exported": {
+    "message": "自定义工具已导出：$TOOL_NAME$",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_importZip": {
+    "message": "导入工具"
+  },
+  "customTool_importFailed": {
+    "message": "自定义工具导入失败"
+  },
+  "customTool_importExists": {
+    "message": "已存在同名自定义工具「$TOOL_NAME$」",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_imported": {
+    "message": "自定义工具已导入：$TOOL_NAME$",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
   "sessionMgr_title": {
     "message": "会话"
   },

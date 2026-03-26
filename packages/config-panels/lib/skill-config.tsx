@@ -21,9 +21,11 @@ import {
 import {
   ZapIcon,
   UploadIcon,
+  DownloadIcon,
   TrashIcon,
   AlertTriangleIcon,
 } from 'lucide-react';
+import JSZip from 'jszip';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -110,6 +112,35 @@ const SkillConfig = ({ agentId, onMutate }: SkillConfigProps) => {
       });
     },
     [skills, agentId, notifyMutate, t],
+  );
+
+  const handleExportSkill = useCallback(
+    async (file: DbWorkspaceFile) => {
+      const skillDirPrefix = file.name.replace(/SKILL\.md$/, '');
+      const skillName = skillDirPrefix.replace(/^skills\//, '').replace(/\/$/, '');
+      try {
+        const allFiles = await listWorkspaceFiles(agentId);
+        const skillFiles = allFiles.filter(f => f.name.startsWith(skillDirPrefix));
+        const zip = new JSZip();
+        for (const f of skillFiles) {
+          const relativePath = f.name.slice(skillDirPrefix.length);
+          zip.file(relativePath, f.content);
+        }
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${skillName}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success(t('skill_exported', skillName));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('skill_importFailed'));
+      }
+    },
+    [agentId, t],
   );
 
   const handleImportSkill = useCallback(() => {
@@ -199,6 +230,14 @@ const SkillConfig = ({ agentId, onMutate }: SkillConfigProps) => {
                 {file.enabled ? t('common_on') : t('common_off')}
               </button>
               <div className="flex shrink-0 gap-1">
+                <Button
+                  onClick={() => handleExportSkill(file)}
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-foreground"
+                  title={t('skill_exportZip')}>
+                  <DownloadIcon className="size-4" />
+                </Button>
                 {!file.predefined && (
                   <Button
                     onClick={() => handleDelete(file)}

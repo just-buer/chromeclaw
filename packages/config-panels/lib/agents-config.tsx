@@ -1090,12 +1090,58 @@ const agentToolIconMap: Record<string, LucideIcon> = {
 
 const GOOGLE_GROUPS = new Set(['gmail', 'calendar', 'drive']);
 
+/**
+ * Parse custom tool metadata from // @tool comment annotations in a .js file.
+ * Mirrors the parseToolMetadata logic in execute-js.ts (background).
+ */
+const parseCustomToolJs = (
+  content: string,
+  filePath: string,
+): { name: string; description: string; params: NonNullable<AgentConfig['customTools']>[number]['params']; path: string; promptHint?: string } | { error: string } => {
+  const lines = content.split('\n');
+  let name: string | undefined;
+  let description: string | undefined;
+  const params: NonNullable<AgentConfig['customTools']>[number]['params'] = [];
+  const promptLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('//')) continue;
+    const comment = trimmed.slice(2).trim();
+
+    const toolMatch = comment.match(/^@tool\s+(\S+)/);
+    if (toolMatch) { name = toolMatch[1]; continue; }
+
+    const descMatch = comment.match(/^@description\s+(.+)/);
+    if (descMatch) { description = descMatch[1].trim(); continue; }
+
+    const paramMatch = comment.match(/^@param\s+(\S+)\s+(\S+)\s+"([^"]+)"/);
+    if (paramMatch) { params.push({ name: paramMatch[1], type: paramMatch[2], description: paramMatch[3] }); continue; }
+
+    const promptMatch = comment.match(/^@prompt\s+(.+)/);
+    if (promptMatch) { promptLines.push(promptMatch[1].trim()); }
+  }
+
+  if (!name) return { error: 'Missing @tool annotation. Add: // @tool my_tool_name' };
+  if (!description) return { error: 'Missing @description annotation. Add: // @description What this tool does' };
+
+  return {
+    name,
+    description,
+    params,
+    path: filePath,
+    ...(promptLines.length > 0 ? { promptHint: promptLines.join('\n') } : {}),
+  };
+};
+
 const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () => void }) => {
+  const tTools = useT();
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [globalConfig, setGlobalConfig] = useState<ToolConfigData | null>(null);
   const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const importToolInputRef = useRef<HTMLInputElement>(null);
 
   // Check Google connection status on mount (mirrors tool-config.tsx pattern)
   useEffect(() => {
@@ -1243,6 +1289,97 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
       onReload();
     },
     [agentConfig, agentId, onReload],
+  );
+
+  const handleExportCustomTool = useCallback(
+    async (ct: NonNullable<AgentConfig['customTools']>[number]) => {
+      try {
+        const allFiles = await listWorkspaceFiles(agentId);
+        const scriptFile = allFiles.find(f => f.name === ct.path);
+
+        let content: string;
+        if (scriptFile) {
+          content = scriptFile.content;
+        } else {
+          // Reconstruct .js file from metadata if script file is missing
+          const paramLines = ct.params.map(p => `// @param ${p.name} ${p.type} "${p.description}"`).join('\n');
+          const promptLines = ct.promptHint ? ct.promptHint.split('\n').map(l => `// @prompt ${l}`).join('\n') : '';
+          content = [
+            `// @tool ${ct.name}`,
+            `// @description ${ct.description}`,
+            ...(promptLines ? [promptLines] : []),
+            ...(paramLines ? [paramLines] : []),
+          ].join('\n') + '\n';
+        }
+
+        const blob = new Blob([content], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${ct.name}.js`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success(tTools('customTool_exported', ct.name));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : tTools('customTool_importFailed'));
+      }
+    },
+    [agentId, tTools],
+  );
+
+  const handleImportCustomTool = useCallback(() => {
+    importToolInputRef.current?.click();
+  }, []);
+
+  const handleImportToolFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = '';
+
+      try {
+        const content = await file.text();
+        const filename = file.name.endsWith('.js') ? file.name : `${file.name}.js`;
+        const scriptPath = `tools/${filename}`;
+
+        const toolMeta = parseCustomToolJs(content, scriptPath);
+        if ('error' in toolMeta) throw new Error(toolMeta.error);
+
+        if (!agentConfig) throw new Error('Agent config not loaded.');
+
+        const existing = agentConfig.customTools ?? [];
+        if (existing.some(ct => ct.name === toolMeta.name)) {
+          toast.error(tTools('customTool_importExists', toolMeta.name));
+          return;
+        }
+
+        const now = Date.now();
+        await createWorkspaceFile({
+          id: nanoid(),
+          name: scriptPath,
+          content,
+          enabled: true,
+          owner: 'user',
+          predefined: false,
+          createdAt: now,
+          updatedAt: now,
+          agentId,
+        });
+
+        const updatedTools = [...existing, toolMeta];
+        await updateAgent(agentId, { customTools: updatedTools });
+        setAgentConfig(prev =>
+          prev ? { ...prev, customTools: updatedTools, updatedAt: Date.now() } : null,
+        );
+        toast.success(tTools('customTool_imported', toolMeta.name));
+        onReload();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : tTools('customTool_importFailed'));
+      }
+    },
+    [agentConfig, agentId, tTools, onReload],
   );
 
   if (loading) {
@@ -1431,17 +1568,28 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
         </Card>
 
         {/* Custom tools */}
-        {customTools.length > 0 && (
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <CodeIcon className="size-4" />
                 Custom Tools
               </CardTitle>
-            </CardHeader>
+              <Button
+                onClick={handleImportCustomTool}
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs">
+                <UploadIcon className="mr-1 size-3" />
+                {tTools('customTool_importZip')}
+              </Button>
+            </div>
+          </CardHeader>
+          {customTools.length > 0 && (
             <CardContent className="space-y-3">
               {customTools.map(ct => {
                 const checkboxId = `agent-custom-tool-${ct.name}`;
+                const approvalId = `agent-custom-tool-approval-${ct.name}`;
                 return (
                   <div key={ct.name} className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -1457,10 +1605,30 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                       {ct.params.length > 0 && (
                         <p className="text-muted-foreground text-xs">
                           Params: {ct.params.map(p => p.name).join(', ')}
-                          </p>
+                        </p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {isEnabled(ct.name, true) && (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <input
+                              checked={isApprovalRequired(ct.name)}
+                              className="accent-yellow-500 size-3.5 cursor-pointer"
+                              id={approvalId}
+                              onChange={e => handleApprovalToggle(ct.name, e.target.checked)}
+                              title="Require approval before executing"
+                              type="checkbox"
+                            />
+                            <Label
+                              className="text-muted-foreground cursor-pointer text-xs"
+                              htmlFor={approvalId}>
+                              审批
+                            </Label>
+                          </div>
+                          <Separator className="h-4" orientation="vertical" />
+                        </>
+                      )}
                       <input
                         checked={isEnabled(ct.name, true)}
                         className="accent-primary size-4"
@@ -1468,6 +1636,13 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                         onChange={e => handleToggle(ct.name, e.target.checked)}
                         type="checkbox"
                       />
+                      <button
+                        className="text-muted-foreground hover:text-foreground rounded p-1"
+                        onClick={() => handleExportCustomTool(ct)}
+                        title={tTools('customTool_exportZip')}
+                        type="button">
+                        <DownloadIcon className="size-3.5" />
+                      </button>
                       <button
                         className="text-muted-foreground hover:text-destructive rounded p-1"
                         onClick={() => handleRemoveCustomTool(ct.name)}
@@ -1480,8 +1655,15 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                 );
               })}
             </CardContent>
-          </Card>
-        )}
+          )}
+          <input
+            accept=".js"
+            className="hidden"
+            onChange={handleImportToolFileSelected}
+            ref={importToolInputRef}
+            type="file"
+          />
+        </Card>
 
         {/* MCP Servers — per-agent overrides */}
         <Card>
@@ -1551,6 +1733,83 @@ const AgentToolsTab = ({ agentId, onReload }: { agentId: string; onReload: () =>
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Tool Development */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <CodeIcon className="size-4" />
+              工具开发
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-muted-foreground text-xs">
+              自定义工具是单个 <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">.js</code> 文件，通过注释头声明元数据，代码体支持 <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">async/await</code>，通过 <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">args.参数名</code> 访问入参。
+            </p>
+            <div className="bg-muted rounded-md p-3 font-mono text-[11px] leading-relaxed">
+              <p className="text-blue-500">{'// @tool tool_name'}</p>
+              <p className="text-blue-500">{'// @description 工具描述'}</p>
+              <p className="text-blue-500">{'// @param city string "城市名称"'}</p>
+              <p className="text-blue-500">{'// @param options object "配置项，包含字段：{unit: string}"'}</p>
+              <p className="text-muted-foreground mt-1">{''}</p>
+              <p>{'async function run(args) {'}</p>
+              <p className="pl-4">{'const { city, options = {} } = args;'}</p>
+              <p className="pl-4">{'// ... 实现逻辑'}</p>
+              <p className="pl-4">{'return JSON.stringify({ city });'}</p>
+              <p>{'}'}</p>
+            </div>
+            <Button
+              className="h-7 text-xs"
+              onClick={() => {
+                const example = `// @tool weather_forecast
+// @description 获取指定城市的天气预报，支持单位和天数配置
+// @param city string "城市名称，例如 'Beijing' 或 'New York'"
+// @param options object "配置项，包含字段：{unit: 'celsius'|'fahrenheit', days: number}，默认 celsius / 1天"
+// @prompt 当用户询问天气时优先使用此工具
+
+async function run(args) {
+  const { city, options = {} } = args;
+  const unit = options.unit || 'celsius';
+  const days = options.days || 1;
+
+  const response = await fetch(
+    \`https://wttr.in/\${encodeURIComponent(city)}?format=j1\`
+  );
+  if (!response.ok) {
+    return JSON.stringify({ error: \`无法获取 \${city} 的天气数据\` });
+  }
+
+  const data = await response.json();
+  const current = data.current_condition[0];
+  const tempC = parseInt(current.temp_C);
+  const temp = unit === 'fahrenheit' ? Math.round(tempC * 9 / 5 + 32) : tempC;
+
+  return JSON.stringify({
+    city,
+    temperature: \`\${temp}°\${unit === 'fahrenheit' ? 'F' : 'C'}\`,
+    description: current.weatherDesc[0].value,
+    humidity: current.humidity + '%',
+    days,
+  });
+}
+`;
+                const blob = new Blob([example], { type: 'text/javascript' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'weather_forecast.js';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }}
+              size="sm"
+              variant="outline">
+              <DownloadIcon className="mr-1 size-3" />
+              下载完整示例
+            </Button>
           </CardContent>
         </Card>
       </div>

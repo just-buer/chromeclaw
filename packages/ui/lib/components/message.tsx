@@ -248,7 +248,7 @@ type ToolCallPartProps = {
 
 const ToolCallPart = ({ part, state, toolName, args, result, matchedRule, onApprove, onDeny }: ToolCallPartProps) => (
   <div className="w-full" key={part.toolCallId}>
-    <Tool className="w-full" defaultOpen={true}>
+    <Tool className="w-full" defaultOpen={state === 'pending-approval'}>
       <ToolHeader name={toolName} state={state} />
       <ToolContent>
         {(state === 'input-available' || state === 'pending-approval' || state === 'output-available' || state === 'output-error') && (

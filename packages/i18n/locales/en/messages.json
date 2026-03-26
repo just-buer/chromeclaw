@@ -560,6 +560,50 @@
       }
     }
   },
+  "skill_exportZip": {
+    "message": "Export as Zip"
+  },
+  "skill_exported": {
+    "message": "Skill exported: $SKILL_NAME$",
+    "placeholders": {
+      "skill_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_exportZip": {
+    "message": "Export as Zip"
+  },
+  "customTool_exported": {
+    "message": "Custom tool exported: $TOOL_NAME$",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_importZip": {
+    "message": "Import Tool"
+  },
+  "customTool_importFailed": {
+    "message": "Failed to import custom tool"
+  },
+  "customTool_importExists": {
+    "message": "A custom tool named \"$TOOL_NAME$\" already exists",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
+  "customTool_imported": {
+    "message": "Custom tool imported: $TOOL_NAME$",
+    "placeholders": {
+      "tool_name": {
+        "content": "$1"
+      }
+    }
+  },
   "sessionMgr_title": {
     "message": "Sessions"
   },
