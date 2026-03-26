@@ -1,6 +1,6 @@
 {
   "name": "@extension/ui",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "chrome extension - chat UI components",
   "type": "module",
   "private": true,
