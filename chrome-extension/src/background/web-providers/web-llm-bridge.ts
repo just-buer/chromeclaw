@@ -102,6 +102,29 @@ export const requestWebGeneration = (opts: {
     const adapterFlush = adapter.flush();
     if (adapterFlush) emitParsedEvents(xmlParser.feed(adapterFlush.feedText));
     emitParsedEvents(xmlParser.flush());
+
+    // Allow provider-specific finalization via adapter.onFinish().
+    // Adapters can promote thinking content, detect empty responses, etc.
+    if (adapter.onFinish) {
+      const thinkingPart = partial.content.find(c => c.type === 'thinking');
+      const result = adapter.onFinish({
+        hasToolCalls,
+        fullText,
+        thinkingContent: thinkingPart && thinkingPart.type === 'thinking'
+          ? thinkingPart.thinking
+          : undefined,
+      });
+      if (result && 'error' in result) {
+        emitError(result.error);
+        return;
+      }
+      if (result && 'promotedText' in result) {
+        fullText = result.promotedText;
+        partial.content = partial.content.filter(c => c.type !== 'thinking');
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: fullText, partial });
+      }
+    }
+
     textContent.text = fullText;
 
     cleanup();
@@ -134,10 +157,10 @@ export const requestWebGeneration = (opts: {
       }
       switch (event.type) {
         case 'text':
-          // Suppress text emitted after tool calls — likely hallucinated content
-          // based on fake <tool_response> blocks the model generated inline.
-          // The agent loop will re-prompt with real tool results on the next turn.
-          if (hasToolCalls) break;
+          // Suppress text after tool calls if the provider opts in (default: true).
+          // Hallucinated content based on fake <tool_response> blocks is discarded;
+          // the agent loop will re-prompt with real tool results on the next turn.
+          if (hasToolCalls && (adapter.suppressAfterToolCalls?.text ?? true)) break;
           fullText += event.text;
           textContent.text = fullText;
           stream.push({ type: 'text_delta', contentIndex: 0, delta: event.text, partial });
@@ -192,6 +215,8 @@ export const requestWebGeneration = (opts: {
           break;
         }
         case 'tool_call_malformed':
+          // Suppress malformed tool calls after real ones if provider opts in (default: true).
+          if (hasToolCalls && (adapter.suppressAfterToolCalls?.malformed ?? true)) break;
           fullText += event.rawText;
           textContent.text = fullText;
           stream.push({

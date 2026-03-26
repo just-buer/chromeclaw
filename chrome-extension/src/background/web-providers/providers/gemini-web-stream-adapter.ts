@@ -148,6 +148,26 @@ const createGeminiStreamAdapter = (): SseStreamAdapter => {
     // via WEB_LLM_DONE; the bridge already sets stopReason='toolUse' when
     // hasToolCalls is true.
     shouldAbort: () => false,
+
+    // Gemini hallucinates multi-step conversations after tool calls —
+    // suppress both text and malformed tool_call bodies post-tool-call.
+    suppressAfterToolCalls: { text: true, malformed: true },
+
+    // Gemini sometimes wraps the entire response in <think> tags with no
+    // visible text after. Promote thinking content to text so the user
+    // sees the response.
+    onFinish({ hasToolCalls: hasTools, fullText: text, thinkingContent }) {
+      // Promote thinking-only responses to visible text
+      if (!hasTools && !text && thinkingContent) {
+        return { promotedText: thinkingContent };
+      }
+      // Gemini sometimes returns a completely empty stream (e.g. after tool
+      // results in long conversations). Treat as error so the agent loop retries.
+      if (!hasTools && !text && !thinkingContent) {
+        return { error: 'Gemini returned an empty response' };
+      }
+      return null;
+    },
   };
 };
 

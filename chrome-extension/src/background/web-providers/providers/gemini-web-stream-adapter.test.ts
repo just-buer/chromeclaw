@@ -273,4 +273,63 @@ describe('createGeminiStreamAdapter', () => {
       });
     });
   });
+
+  describe('onFinish', () => {
+    it('promotes thinking-only response to text', () => {
+      const adapter = createGeminiStreamAdapter();
+      const result = adapter.onFinish!({
+        hasToolCalls: false,
+        fullText: '',
+        thinkingContent: 'This is the actual response.',
+      });
+      expect(result).toEqual({ promotedText: 'This is the actual response.' });
+    });
+
+    it('does not promote when text is already present', () => {
+      const adapter = createGeminiStreamAdapter();
+      const result = adapter.onFinish!({
+        hasToolCalls: false,
+        fullText: 'Some visible text.',
+        thinkingContent: 'Some reasoning.',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('does not promote when tool calls are present', () => {
+      const adapter = createGeminiStreamAdapter();
+      const result = adapter.onFinish!({
+        hasToolCalls: true,
+        fullText: '',
+        thinkingContent: 'Reasoning before tool call.',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('returns error on completely empty response', () => {
+      const adapter = createGeminiStreamAdapter();
+      const result = adapter.onFinish!({
+        hasToolCalls: false,
+        fullText: '',
+        thinkingContent: undefined,
+      });
+      expect(result).toEqual({ error: 'Gemini returned an empty response' });
+    });
+
+    it('returns null when tool calls are present but no text', () => {
+      const adapter = createGeminiStreamAdapter();
+      const result = adapter.onFinish!({
+        hasToolCalls: true,
+        fullText: '',
+        thinkingContent: undefined,
+      });
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('suppressAfterToolCalls', () => {
+    it('is configured to suppress both text and malformed', () => {
+      const adapter = createGeminiStreamAdapter();
+      expect(adapter.suppressAfterToolCalls).toEqual({ text: true, malformed: true });
+    });
+  });
 });

@@ -30,6 +30,8 @@ vi.mock('./auth', () => ({
   })),
 }));
 
+const mockParseSseDelta = (data: any) => data?.choices?.[0]?.delta?.content ?? null;
+
 vi.mock('./registry', () => ({
   getWebProvider: vi.fn((id: string) => {
     if (id === 'qwen-web') {
@@ -48,7 +50,26 @@ vi.mock('./registry', () => ({
           url: 'https://chat.qwen.ai/api/chat/completions',
           init: { method: 'POST', body: '{}' },
         }),
-        parseSseDelta: (data: any) => data?.choices?.[0]?.delta?.content ?? null,
+        parseSseDelta: mockParseSseDelta,
+      };
+    }
+    if (id === 'gemini-web') {
+      return {
+        id: 'gemini-web',
+        name: 'Gemini (Web)',
+        loginUrl: 'https://gemini.google.com',
+        cookieDomain: '.google.com',
+        sessionIndicators: ['SID'],
+        defaultModelId: 'gemini-3-flash',
+        defaultModelName: 'Gemini 3 Flash',
+        supportsTools: true,
+        supportsReasoning: true,
+        contextWindow: 150_000,
+        buildRequest: () => ({
+          url: 'https://gemini.google.com/api',
+          init: { method: 'POST', body: '{}' },
+        }),
+        parseSseDelta: mockParseSseDelta,
       };
     }
     return undefined;
@@ -101,8 +122,21 @@ const defaultModel: ChatModel = {
   webProviderId: 'qwen-web',
 };
 
+const geminiModel: ChatModel = {
+  id: 'gemini-3-flash',
+  name: 'Gemini 3 Flash',
+  provider: 'web',
+  webProviderId: 'gemini-web',
+};
+
 const defaultOpts = {
   modelConfig: defaultModel,
+  messages: [{ role: 'user', content: 'Hello' }],
+  systemPrompt: 'You are helpful.',
+};
+
+const geminiOpts = {
+  modelConfig: geminiModel,
   messages: [{ role: 'user', content: 'Hello' }],
   systemPrompt: 'You are helpful.',
 };
@@ -152,7 +186,7 @@ describe('requestWebGeneration', () => {
     expect(textDelta!.delta).toBe('Hello');
   });
 
-  it('emits done on WEB_LLM_DONE', async () => {
+  it('emits done on WEB_LLM_DONE with content', async () => {
     const stream = requestWebGeneration(defaultOpts);
 
     await vi.waitFor(() => {
@@ -160,6 +194,31 @@ describe('requestWebGeneration', () => {
       expect(events.some(e => e.type === 'start')).toBe(true);
     });
 
+    // Send some content first, then done
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
+    });
+    fireMessage({
+      type: 'WEB_LLM_DONE',
+      requestId: 'web-test-uuid',
+    });
+
+    const events = (stream as any).events as Array<{ type: string }>;
+    expect(events.some(e => e.type === 'text_end')).toBe(true);
+    expect(events.some(e => e.type === 'done')).toBe(true);
+  });
+
+  it('allows empty response for providers without onFinish (Qwen)', async () => {
+    const stream = requestWebGeneration(defaultOpts);
+
+    await vi.waitFor(() => {
+      const events = (stream as any).events as Array<{ type: string }>;
+      expect(events.some(e => e.type === 'start')).toBe(true);
+    });
+
+    // WEB_LLM_DONE with no content — Qwen adapter has no onFinish, so this is just empty done
     fireMessage({
       type: 'WEB_LLM_DONE',
       requestId: 'web-test-uuid',
@@ -342,6 +401,71 @@ describe('requestWebGeneration', () => {
     const doneEvent = events.find(e => e.type === 'done');
     expect(doneEvent).toBeDefined();
     expect(doneEvent!.reason).toBe('toolUse');
+  });
+
+  it('suppresses malformed tool_call after real tool_call', async () => {
+    const stream = requestWebGeneration(defaultOpts);
+
+    await vi.waitFor(() => {
+      const events = (stream as any).events as Array<{ type: string }>;
+      expect(events.some(e => e.type === 'start')).toBe(true);
+    });
+
+    // Real tool call
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"<tool_call id=\\"abc\\" name=\\"browser\\">{\\"action\\":\\"open\\",\\"url\\":\\"https://example.com\\"}</tool_call>"}}]}\n\n',
+    });
+
+    // Malformed tool call (e.g. hallucinated browser.evaluate with broken JSON)
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"<tool_call id=\\"xyz\\" name=\\"browser\\">{\\"action\\":\\"evaluate\\",\\"expression\\":\\"class Foo { #private = null; }</tool_call>"}}]}\n\n',
+    });
+
+    fireMessage({ type: 'WEB_LLM_DONE', requestId: 'web-test-uuid' });
+
+    const events = (stream as any).events as Array<{ type: string; delta?: string }>;
+
+    // Real tool call was emitted
+    expect(events.some(e => e.type === 'toolcall_start')).toBe(true);
+
+    // Malformed body should NOT leak into text
+    const textDeltas = events.filter(e => e.type === 'text_delta').map(e => e.delta);
+    const allText = textDeltas.join('');
+    expect(allText).not.toContain('class Foo');
+    expect(allText).not.toContain('#private');
+  });
+
+  it('does not promote thinking-only response without onFinish hook (Qwen)', async () => {
+    const stream = requestWebGeneration(defaultOpts);
+
+    await vi.waitFor(() => {
+      const events = (stream as any).events as Array<{ type: string }>;
+      expect(events.some(e => e.type === 'start')).toBe(true);
+    });
+
+    // Send response wrapped entirely in <think> tags
+    fireMessage({
+      type: 'WEB_LLM_CHUNK',
+      requestId: 'web-test-uuid',
+      chunk: 'data: {"choices":[{"delta":{"content":"<think>This is thinking content.</think>"}}]}\n\n',
+    });
+
+    fireMessage({ type: 'WEB_LLM_DONE', requestId: 'web-test-uuid' });
+
+    const events = (stream as any).events as Array<{ type: string; delta?: string; content?: string }>;
+
+    // Without onFinish hook, thinking is NOT promoted — text_end content is empty
+    const textEnd = events.find(e => e.type === 'text_end');
+    expect(textEnd).toBeDefined();
+    expect(textEnd!.content).toBe('');
+
+    // Thinking events are still emitted
+    expect(events.some(e => e.type === 'thinking_start')).toBe(true);
+    expect(events.some(e => e.type === 'thinking_end')).toBe(true);
   });
 
   it('emits error when provider is not found', async () => {

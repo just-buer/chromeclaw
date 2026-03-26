@@ -30,6 +30,29 @@ interface SseStreamAdapter {
   shouldAbort(): boolean;
   /** Flush all pending native function calls as XML tool_calls. Used before aborting. */
   flushPendingCalls?(): { feedText: string } | null;
+
+  /**
+   * Per-provider suppression rules for post-tool-call content.
+   * When true, the corresponding event type is discarded after a real tool_call is parsed.
+   * Defaults to `{ text: true, malformed: true }` when unset.
+   */
+  suppressAfterToolCalls?: {
+    text?: boolean;
+    malformed?: boolean;
+  };
+
+  /**
+   * Called at stream end, after adapter + XML parser flush.
+   * Allows provider-specific finalization:
+   * - Return `{ promotedText }` to replace empty text with the given content.
+   * - Return `{ error }` to abort with an error (e.g. empty response from provider).
+   * - Return null for no-op.
+   */
+  onFinish?(state: {
+    hasToolCalls: boolean;
+    fullText: string;
+    thinkingContent: string | undefined;
+  }): { promotedText: string } | { error: string } | null;
 }
 
 const createDefaultAdapter = (): SseStreamAdapter => ({
