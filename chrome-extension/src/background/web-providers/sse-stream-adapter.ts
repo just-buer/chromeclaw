@@ -61,13 +61,16 @@ const createDefaultAdapter = (): SseStreamAdapter => ({
   shouldAbort: () => false,
 });
 
-const getSseStreamAdapter = (providerId: WebProviderId): SseStreamAdapter => {
+const getSseStreamAdapter = (providerId: WebProviderId, opts?: {
+  /** Tool names excluded from the prompt — Qwen adapter skips native interception for these. */
+  excludeTools?: ReadonlySet<string>;
+}): SseStreamAdapter => {
   switch (providerId) {
     case 'claude-web':
       return createClaudeStreamAdapter();
     case 'qwen-web':
     case 'qwen-cn-web':
-      return createQwenStreamAdapter();
+      return createQwenStreamAdapter({ skipNativeTools: opts?.excludeTools });
     case 'kimi-web':
       return createKimiStreamAdapter();
     case 'glm-web':

@@ -80,9 +80,9 @@ export const requestWebGeneration = (opts: {
 
   // Cache provider lookup once — used by the chunk listener
   const cachedProviderId = opts.modelConfig.webProviderId as WebProviderId;
-  const adapter = getSseStreamAdapter(cachedProviderId);
   const cachedProvider = cachedProviderId ? getWebProvider(cachedProviderId) : undefined;
   const strategy = cachedProviderId ? getToolStrategy(cachedProviderId) : undefined;
+  const adapter = getSseStreamAdapter(cachedProviderId, { excludeTools: strategy?.excludeTools });
   const cacheKey = cachedProviderId ? `${cachedProviderId}:${opts.chatId ?? requestId}` : '';
 
   if (cachedProviderId) {
@@ -412,11 +412,14 @@ export const requestWebGeneration = (opts: {
       const providerStrategy = getToolStrategy(providerId);
       let toolPrompt = '';
       if (opts.tools && opts.tools.length > 0) {
-        const toolDefs = opts.tools.map(t => ({
-          name: t.function.name,
-          description: t.function.description,
-          parameters: t.function.parameters as Record<string, unknown>,
-        }));
+        const excluded = providerStrategy.excludeTools;
+        const toolDefs = opts.tools
+          .filter(t => !excluded?.has(t.function.name))
+          .map(t => ({
+            name: t.function.name,
+            description: t.function.description,
+            parameters: t.function.parameters as Record<string, unknown>,
+          }));
         toolPrompt = providerStrategy.buildToolPrompt(toolDefs);
       }
 
