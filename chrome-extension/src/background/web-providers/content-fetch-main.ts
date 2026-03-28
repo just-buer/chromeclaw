@@ -769,7 +769,18 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         }
 
         if (!raw || typeof raw !== 'object') return null;
-        return raw as PowChallenge;
+        const candidate = raw as Record<string, unknown>;
+        // Validate required fields exist before casting
+        if (
+          typeof candidate.algorithm !== 'string' ||
+          typeof candidate.challenge !== 'string' ||
+          typeof candidate.difficulty !== 'number' ||
+          typeof candidate.salt !== 'string' ||
+          typeof candidate.signature !== 'string'
+        ) {
+          return null;
+        }
+        return candidate as unknown as PowChallenge;
       };
 
       // ── Helper: Solve SHA256 PoW challenge ──
@@ -778,7 +789,12 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         challenge: string,
         difficulty: number,
       ): Promise<number> => {
-        const targetDifficulty = difficulty > 1000 ? Math.floor(Math.log2(difficulty)) : difficulty;
+        // DeepSeek's API sends difficulty as either:
+        // - A small number (e.g. 18) meaning "18 leading zero bits" directly, OR
+        // - A large target value (e.g. 262144 = 2^18) from which we derive bit count.
+        // Heuristic: values >64 can't be bit counts (SHA-256 is only 256 bits), so
+        // they must be target values. Use log2 to convert back to bit count.
+        const targetDifficulty = difficulty > 64 ? Math.floor(Math.log2(difficulty)) : difficulty;
         const encoder = new TextEncoder();
 
         for (let nonce = 0; nonce < 1_000_000; nonce++) {
@@ -830,18 +846,26 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
           retptr: number, ptrC: number, lenC: number, ptrP: number, lenP: number, difficulty: number,
         ) => void;
 
-        const prefix = `${powCh.salt}_${powCh.expire_at}_`;
+        const prefix = `${powCh.salt}_${powCh.expire_at ?? 0}_`;
         const challengeStr = powCh.challenge;
 
-        const encodeString = (str: string): [number, number] => {
+        const encodeString = (str: string, ptr: number): number => {
           const buf = new TextEncoder().encode(str);
-          const ptr = alloc(buf.length, 1);
+          // Re-read memory.buffer AFTER alloc — a prior alloc may have grown memory,
+          // detaching the old ArrayBuffer. Always use fresh reference.
           new Uint8Array(memory.buffer).set(buf, ptr);
-          return [ptr, buf.length];
+          return buf.length;
         };
 
-        const [ptrC, lenC] = encodeString(challengeStr);
-        const [ptrP, lenP] = encodeString(prefix);
+        // Allocate BOTH buffers first, THEN write data.
+        // This avoids the detached ArrayBuffer bug: if alloc() triggers memory.grow(),
+        // data written to a pointer from a previous alloc would be lost.
+        const challengeBuf = new TextEncoder().encode(challengeStr);
+        const prefixBuf = new TextEncoder().encode(prefix);
+        const ptrC = alloc(challengeBuf.length, 1);
+        const ptrP = alloc(prefixBuf.length, 1);
+        const lenC = encodeString(challengeStr, ptrC);
+        const lenP = encodeString(prefix, ptrP);
         const retptr = addToStack(-16);
 
         wasmSolve(retptr, ptrC, lenC, ptrP, lenP, powCh.difficulty);
@@ -881,19 +905,41 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         let utPreview = '(none)';
         try {
           const ut = localStorage.getItem('userToken');
-          if (ut) utPreview = `len=${ut.length}, start=${ut.slice(0, 50)}`;
+          if (ut) utPreview = `len=${ut.length}`;
         } catch { /* ignore */ }
 
         window.postMessage(
           {
             type: 'WEB_LLM_ERROR',
             requestId,
-            error: `No auth token found for DeepSeek. userToken: ${utPreview}. URL: ${window.location.href}. Please visit https://chat.deepseek.com, log in, then reconnect via Settings → Models.`,
+            error: `No auth token found for DeepSeek. userToken: ${utPreview}. Please visit https://chat.deepseek.com, log in, then reconnect via Settings → Models.`,
           },
           origin,
         );
         return;
       }
+
+      // Extract client version from the page if possible (avoid hardcoded stale values)
+      let clientVersion = '1.7.0';
+      let appVersion = '20241129.1';
+      try {
+        // DeepSeek injects version info into script tags or window globals
+        const versionMeta = document.querySelector('meta[name="version"]');
+        if (versionMeta?.getAttribute('content')) {
+          appVersion = versionMeta.getAttribute('content')!;
+        }
+        // Check for __NEXT_DATA__ or similar build manifest
+        const nextData = (window as Record<string, unknown>).__NEXT_DATA__ as
+          | { buildId?: string } | undefined;
+        if (nextData?.buildId) {
+          appVersion = nextData.buildId;
+        }
+        // Check for window.__APP_VERSION__ or similar globals
+        const appVer = (window as Record<string, unknown>).__APP_VERSION__ as string | undefined;
+        if (appVer) appVersion = appVer;
+        const clientVer = (window as Record<string, unknown>).__CLIENT_VERSION__ as string | undefined;
+        if (clientVer) clientVersion = clientVer;
+      } catch { /* use defaults */ }
 
       // Common headers for all DeepSeek API calls
       const dsHeaders: Record<string, string> = {
@@ -902,8 +948,8 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         Referer: 'https://chat.deepseek.com/',
         Origin: 'https://chat.deepseek.com',
         'x-client-platform': 'web',
-        'x-client-version': '1.7.0',
-        'x-app-version': '20241129.1',
+        'x-client-version': clientVersion,
+        'x-app-version': appVersion,
         Authorization: `Bearer ${bearer}`,
       };
 

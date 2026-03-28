@@ -26,36 +26,69 @@ const deepseekWeb: WebProviderDefinition = {
   contextWindow: 64_000,
   refreshAuth: async ({ tabId }) => {
     // DeepSeek stores its auth JWT in localStorage as `userToken`.
-    // Extract it during login so it's available for validation.
+    // This logic mirrors extractBearerToken() in content-fetch-main.ts.
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      func: () => {
-        // Primary key: userToken
-        const raw = localStorage.getItem('userToken');
-        if (raw) {
+      func: async () => {
+        // 1. Primary key: userToken
+        const tryParseToken = (raw: string | null): string => {
+          if (!raw) return '';
           try {
             const parsed = JSON.parse(raw);
             if (typeof parsed === 'string') return parsed;
             if (typeof parsed === 'object' && parsed !== null) {
-              return (parsed.token ?? parsed.value ?? parsed.access_token ?? '') as string;
+              return (parsed.token ?? parsed.value ?? parsed.access_token ?? parsed.jwt ?? '') as string;
             }
           } catch { /* not JSON */ }
           return raw;
-        }
-        // Fallback: other known keys
-        for (const key of ['token', 'ds_token', 'auth_token', 'access_token']) {
-          const val = localStorage.getItem(key);
-          if (val && val.length > 10) {
-            try {
-              const parsed = JSON.parse(val);
-              if (typeof parsed === 'string' && parsed.length > 10) return parsed;
-              if (typeof parsed === 'object' && parsed !== null) return (parsed.token ?? '') as string;
-            } catch { /* not JSON */ }
-            return val;
+        };
+
+        let bearer = tryParseToken(localStorage.getItem('userToken'));
+
+        // 2. Fallback: other known keys
+        if (!bearer) {
+          for (const key of ['token', 'ds_token', 'auth_token', 'access_token', 'jwt']) {
+            const val = localStorage.getItem(key);
+            if (val && val.length > 10) {
+              bearer = tryParseToken(val);
+              if (bearer) break;
+            }
           }
         }
-        return null;
+
+        // 3. Broader scan: any key with "token"/"auth" in the name
+        if (!bearer) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key || key === 'userToken') continue;
+            const lk = key.toLowerCase();
+            if (lk.includes('token') || lk.includes('auth') || lk.includes('jwt') || lk.includes('bearer')) {
+              const val = localStorage.getItem(key);
+              if (val && val.length > 10) {
+                bearer = tryParseToken(val);
+                if (bearer) break;
+              }
+            }
+          }
+        }
+
+        // 4. API fallback: fetch token from /api/v0/users/current
+        if (!bearer) {
+          try {
+            const res = await fetch('https://chat.deepseek.com/api/v0/users/current', {
+              credentials: 'include',
+            });
+            if (res.ok) {
+              const data = (await res.json()) as Record<string, unknown>;
+              const inner = data.data as Record<string, unknown> | undefined;
+              const biz = (inner?.biz_data ?? inner) as Record<string, string> | undefined;
+              if (biz?.token) bearer = biz.token;
+            }
+          } catch { /* ignore */ }
+        }
+
+        return bearer || null;
       },
     });
     const token = results?.[0]?.result as string | null;
