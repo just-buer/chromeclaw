@@ -10,6 +10,8 @@ interface SlashCommandContext {
   chatId: string;
   messages: ChatMessage[];
   model: ChatModel;
+  /** Raw argument string after the command name (e.g. "3" for "/copy 3"). */
+  args: string;
   /** Append a system message to the chat (ephemeral, not persisted). */
   appendSystemMessage: (id: string, text: string) => void;
   /** Replace all messages in the chat. */

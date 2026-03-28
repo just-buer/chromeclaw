@@ -42,6 +42,13 @@ interface WebProviderToolStrategy {
 
   /** Serialize assistant message content parts to string for history. */
   serializeAssistantContent?(content: ContentPart[]): string;
+
+  /**
+   * Tool names to exclude from the tool prompt for this provider.
+   * Use when the provider has its own native implementation of a tool
+   * (e.g. Qwen's built-in web_search) that should be used instead.
+   */
+  excludeTools?: ReadonlySet<string>;
 }
 
 // ── Conversation ID Cache ────────────────────────
@@ -208,6 +215,10 @@ const qwenToolStrategy: WebProviderToolStrategy = {
   },
 
   serializeAssistantContent,
+
+  // Qwen has a native server-side web_search — let it handle search natively
+  // instead of injecting our tool definition (which causes parameter mismatches).
+  excludeTools: new Set(['web_search']),
 };
 
 // ── Kimi Strategy ───────────────────────────────

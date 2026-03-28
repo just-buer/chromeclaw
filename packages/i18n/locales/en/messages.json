@@ -325,6 +325,21 @@
   "slash_conversationCleared": {
     "message": "Conversation cleared"
   },
+  "slash_copied": {
+    "message": "Copied to clipboard"
+  },
+  "slash_noAssistantMessage": {
+    "message": "No assistant message to copy"
+  },
+  "slash_invalidCopyArg": {
+    "message": "Invalid argument — use /copy or /copy N (e.g. /copy 2)"
+  },
+  "slash_exported": {
+    "message": "Conversation exported"
+  },
+  "slash_exportEmpty": {
+    "message": "No messages to export"
+  },
   "slash_availableCommands": {
     "message": "Available commands:"
   },
