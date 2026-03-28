@@ -2,8 +2,10 @@
 
 A lightweight [OpenClaw](https://github.com/openclaw)-inspired AI agent running entirely in the Chrome browser sandbox — with multi-provider LLM support, messaging channels (WhatsApp, Telegram), voice (TTS/STT), memory, agents, and browser automation.
 
-[![Available in the Chrome Web Store](https://img.shields.io/chrome-web-store/v/lnahopfgnfhcfchffbckmbbkopcmojme?style=for-the-badge&logo=googlechrome&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme)
-[![Available on Firefox Add-ons](https://img.shields.io/badge/Firefox%20Add--ons-Available-FF7139?style=for-the-badge&logo=firefoxbrowser)](https://addons.mozilla.org/addon/chromeclaw/)
+[![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/lnahopfgnfhcfchffbckmbbkopcmojme?style=for-the-badge&logo=googlechrome&label=Chrome)](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme)
+[![Chrome Web Store Users](https://img.shields.io/chrome-web-store/users/lnahopfgnfhcfchffbckmbbkopcmojme?style=for-the-badge&logo=googlechrome&label=Users)](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme)
+[![Firefox Add-on Version](https://img.shields.io/amo/v/chromeclaw?style=for-the-badge&logo=firefoxbrowser&label=Firefox)](https://addons.mozilla.org/addon/chromeclaw/)
+[![Firefox Add-on Users](https://img.shields.io/amo/users/chromeclaw?style=for-the-badge&logo=firefoxbrowser&label=Users)](https://addons.mozilla.org/addon/chromeclaw/)
 
 ## Overview
 

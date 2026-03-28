@@ -270,6 +270,7 @@ const Chat = ({
                   chatId,
                   messages,
                   model: selectedModel,
+                  args: parsed.args,
                   appendSystemMessage: (id, text) =>
                     setMessages(prev => [
                       ...prev,

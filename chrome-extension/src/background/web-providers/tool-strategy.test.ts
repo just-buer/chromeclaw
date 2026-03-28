@@ -388,6 +388,17 @@ describe('qwenToolStrategy', () => {
       expect(result).toBe('Hello');
     });
   });
+
+  describe('excludeTools', () => {
+    it('excludes web_search from tool prompt', () => {
+      expect(qwenToolStrategy.excludeTools).toBeDefined();
+      expect(qwenToolStrategy.excludeTools!.has('web_search')).toBe(true);
+    });
+
+    it('does not exclude other tools', () => {
+      expect(qwenToolStrategy.excludeTools!.has('web_fetch')).toBe(false);
+    });
+  });
 });
 
 // ── Kimi Strategy ───────────────────────────────

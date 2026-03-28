@@ -90,4 +90,93 @@ describe('createKimiStreamAdapter', () => {
       expect(adapter.shouldAbort()).toBe(false);
     });
   });
+
+  describe('processEvent — block.exception', () => {
+    it('captures REASON_COMPLETION_OVERLOADED from block.exception', () => {
+      const adapter = createKimiStreamAdapter();
+      const result = adapter.processEvent({
+        parsed: {
+          op: 'set',
+          mask: 'block.exception',
+          block: {
+            id: '1',
+            exception: {
+              error: {
+                reason: 'REASON_COMPLETION_OVERLOADED',
+                localizedMessage: {
+                  locale: 'zh-CN',
+                  message: '不好意思，刚刚和Kimi聊的人太多了。',
+                },
+                severity: 'SEVERITY_BLOCK_RETRACT',
+              },
+            },
+          },
+        },
+        delta: null,
+      });
+      // processEvent returns null (no text to feed), but stores the error
+      expect(result).toBeNull();
+
+      // onFinish surfaces the captured error
+      const finish = adapter.onFinish!({ hasToolCalls: false, fullText: '', thinkingContent: undefined });
+      expect(finish).toEqual({ error: '不好意思，刚刚和Kimi聊的人太多了。' });
+    });
+
+    it('falls back to reason when no localizedMessage', () => {
+      const adapter = createKimiStreamAdapter();
+      adapter.processEvent({
+        parsed: {
+          op: 'set',
+          mask: 'block.exception',
+          block: {
+            id: '1',
+            exception: {
+              error: {
+                reason: 'REASON_UNKNOWN',
+              },
+            },
+          },
+        },
+        delta: null,
+      });
+      const finish = adapter.onFinish!({ hasToolCalls: false, fullText: '', thinkingContent: undefined });
+      expect(finish).toEqual({ error: 'REASON_UNKNOWN' });
+    });
+  });
+
+  describe('onFinish', () => {
+    it('returns error on completely empty response', () => {
+      const adapter = createKimiStreamAdapter();
+      const result = adapter.onFinish!({ hasToolCalls: false, fullText: '', thinkingContent: undefined });
+      expect(result).toEqual({ error: 'Kimi returned an empty response' });
+    });
+
+    it('returns null when text is present', () => {
+      const adapter = createKimiStreamAdapter();
+      const result = adapter.onFinish!({ hasToolCalls: false, fullText: 'Some response', thinkingContent: undefined });
+      expect(result).toBeNull();
+    });
+
+    it('returns null when tool calls are present', () => {
+      const adapter = createKimiStreamAdapter();
+      const result = adapter.onFinish!({ hasToolCalls: true, fullText: '', thinkingContent: undefined });
+      expect(result).toBeNull();
+    });
+
+    it('prioritizes server error over empty response', () => {
+      const adapter = createKimiStreamAdapter();
+      // Capture a server error first
+      adapter.processEvent({
+        parsed: {
+          op: 'set',
+          mask: 'block.exception',
+          block: { id: '1', exception: { error: { reason: 'REASON_COMPLETION_OVERLOADED', localizedMessage: { message: 'Kimi is overloaded' } } } },
+        },
+        delta: null,
+      });
+      // Even with some text, server error takes priority
+      const result = adapter.onFinish!({ hasToolCalls: false, fullText: '', thinkingContent: undefined });
+      expect(result).toEqual({ error: 'Kimi is overloaded' });
+    });
+  });
 });

@@ -44,7 +44,11 @@ interface PendingCall {
   arguments: string;
 }
 
-const createQwenStreamAdapter = (): SseStreamAdapter => {
+const createQwenStreamAdapter = (opts?: {
+  /** Tool names to skip during native call interception — let Qwen handle them server-side. */
+  skipNativeTools?: ReadonlySet<string>;
+}): SseStreamAdapter => {
+  const skipNative = opts?.skipNativeTools;
   let currentPhase: string | undefined;
   /** Set to true when a native tool call gets "Tool X does not exists" from Qwen's server. */
   let nativeToolFailed = false;
@@ -85,6 +89,10 @@ const createQwenStreamAdapter = (): SseStreamAdapter => {
 
       // --- Native function_call accumulation ---
       if (choiceDelta?.function_call) {
+        // Skip tools that should be handled entirely by Qwen's server
+        if (skipNative?.has(choiceDelta.function_call.name)) {
+          return null;
+        }
         const fnKey = choiceDelta.function_id ?? DEFAULT_FN_KEY;
         const existing = pendingFunctionCalls.get(fnKey);
 

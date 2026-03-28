@@ -4,15 +4,16 @@ import type { SlashCommandDef, SlashCommandContext } from './types.js';
 /** Only matches when the entire message is a slash command (e.g. "/help").
  *  "hello /help" or "/help\nmore text" are NOT treated as commands — sent to LLM. */
 const parseSlashCommand = (input: string): { command: string; args: string } | null => {
-  if (input.includes('\n')) return null;
+  if (input.includes('\n') || input.includes('\r')) return null;
   const trimmed = input.trim();
   if (!trimmed.startsWith('/')) return null;
-  const match = trimmed.match(/^\/([a-z_]+)$/i);
+  const match = trimmed.match(/^\/([a-z_]+)(?:\s+(.*))?$/i);
   if (!match) return null;
   const name = match[1].toLowerCase();
   if (!commands.some(c => c.name === name)) return null;
-  console.debug('[slash-cmd] parsed command:', name);
-  return { command: name, args: '' };
+  const args = (match[2] ?? '').trim();
+  console.debug('[slash-cmd] parsed command:', name, 'args:', args);
+  return { command: name, args };
 };
 
 const getSlashCommands = (): readonly SlashCommandDef[] => commands;
