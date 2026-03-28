@@ -26,9 +26,9 @@ const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTab
     {activeTab === 'tool' && (
       <>
         <ToolConfig />
-        <EmbeddingConfigPanel />
+        {/* <EmbeddingConfigPanel />
         <SpeechToTextConfig />
-        <TextToSpeechConfig />
+        <TextToSpeechConfig /> */}
       </>
     )}
     {activeTab === 'mcp' && <McpConfig />}
@@ -36,12 +36,12 @@ const ConfigPanelContent = ({ activeTab, onOpenSession }: { activeTab: ConfigTab
     {activeTab === 'actions' && <SuggestedActionsConfig />}
     {activeTab === 'skills' && <SkillConfig />}
     {activeTab === 'agents' && <AgentsConfig />}
-    {activeTab === 'channels' && (
+    {/* {activeTab === 'channels' && (
       <>
         <TelegramConfig />
         <WhatsAppConfig />
       </>
-    )}
+    )} */}
     {activeTab === 'cron' && <CronConfig />}
     {activeTab === 'sessions' && <SessionManager onOpenSession={onOpenSession} />}
     {activeTab === 'usage' && <UsageDashboard />}

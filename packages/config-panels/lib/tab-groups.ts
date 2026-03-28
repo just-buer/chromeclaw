@@ -41,7 +41,7 @@ const getConfigTabGroups = (): ConfigTabGroup[] => [
   {
     label: t('tabGroup_control'),
     tabs: [
-      { id: 'channels', label: t('tab_channels'), icon: SendIcon },
+      // { id: 'channels', label: t('tab_channels'), icon: SendIcon },
       { id: 'cron', label: t('tab_cronJobs'), icon: ClockIcon },
       { id: 'sessions', label: t('tab_sessions'), icon: MessagesSquareIcon },
       { id: 'usage', label: t('tab_usage'), icon: BarChart3Icon },
@@ -64,7 +64,7 @@ const getConfigTabGroups = (): ConfigTabGroup[] => [
       { id: 'approval-rules', label: '审批规则', icon: ShieldAlertIcon },
       { id: 'actions', label: t('tab_actions'), icon: LightbulbIcon },
       { id: 'logs', label: t('tab_logs'), icon: ScrollTextIcon },
-      { id: 'community', label: t('tab_community'), icon: MessageCircleIcon },
+      // { id: 'community', label: t('tab_community'), icon: MessageCircleIcon },
     ],
   },
 ];

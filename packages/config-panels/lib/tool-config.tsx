@@ -595,7 +595,7 @@ const ToolConfig = () => {
             })}
 
           {/* ── Google Services unified section ── */}
-          <div>
+          <div hidden={true}>
             <Separator className="mb-4" />
             <div className="space-y-4">
               <div className="flex items-center gap-3">
