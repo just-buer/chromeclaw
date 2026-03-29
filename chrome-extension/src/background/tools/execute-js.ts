@@ -1,4 +1,5 @@
 import { cdpSend, cdpAttach } from './cdp';
+import { injectControlIndicator, removeControlIndicator } from './tab-indicator';
 import { getActiveAgentId, getWorkspaceFile } from './tool-utils';
 import { getAgent, updateAgent } from '@extension/storage';
 import { IS_FIREFOX } from '@extension/env';
@@ -464,7 +465,12 @@ const executeJs = async (args: ExecuteJsArgs): Promise<string> => {
         return 'Error: Provide either "code" or "path" for execute action.';
       }
 
-      return await executeCode(code, args.args, args.timeout, args.tabId, args.exportAs);
+      if (args.tabId != null) await injectControlIndicator(args.tabId);
+      try {
+        return await executeCode(code, args.args, args.timeout, args.tabId, args.exportAs);
+      } finally {
+        if (args.tabId != null) removeControlIndicator(args.tabId).catch(() => {});
+      }
     } catch (err) {
       return `Error: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -505,7 +511,12 @@ ${maybeAutoReturn(file.content)}
 
       // executeCode already wraps in (async () => { ... })() so just join parts
       const bundled = parts.join('\n');
-      return await executeCode(bundled, args.args, args.timeout, args.tabId);
+      if (args.tabId != null) await injectControlIndicator(args.tabId);
+      try {
+        return await executeCode(bundled, args.args, args.timeout, args.tabId);
+      } finally {
+        if (args.tabId != null) removeControlIndicator(args.tabId).catch(() => {});
+      }
     } catch (err) {
       return `Error: ${err instanceof Error ? err.message : String(err)}`;
     }

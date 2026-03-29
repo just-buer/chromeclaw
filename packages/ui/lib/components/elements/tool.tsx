@@ -1,11 +1,12 @@
 import { cn } from '../../utils';
-import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui';
+import { Badge, Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui';
 import {
   CheckCircleIcon,
   ChevronDownIcon,
   CircleIcon,
   ClockIcon,
   ShieldAlertIcon,
+  CopyIcon,
   WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
@@ -21,6 +22,8 @@ const Tool = ({ className, ...props }: ToolProps) => (
 type ToolHeaderProps = {
   name: string;
   state: ToolPartState;
+  /** Copy handler — when provided, a copy button is shown in the header. */
+  onCopy?: () => void;
   className?: string;
 };
 
@@ -47,7 +50,7 @@ const getStatusBadge = (status: ToolPartState) => (
   </Badge>
 );
 
-const ToolHeader = ({ className, name, state, ...props }: ToolHeaderProps) => (
+const ToolHeader = ({ className, name, state, onCopy, ...props }: ToolHeaderProps) => (
   <CollapsibleTrigger
     className={cn('flex w-full min-w-0 items-center justify-between gap-2 p-3', className)}
     {...props}>
@@ -57,6 +60,18 @@ const ToolHeader = ({ className, name, state, ...props }: ToolHeaderProps) => (
     </div>
     <div className="flex shrink-0 items-center gap-2">
       {getStatusBadge(state)}
+      {onCopy && (
+        <Button
+          className="size-6"
+          onClick={e => {
+            e.stopPropagation();
+            onCopy();
+          }}
+          size="icon"
+          variant="ghost">
+          <CopyIcon className="size-3" />
+        </Button>
+      )}
       <ChevronDownIcon className="text-muted-foreground size-4 transition-transform group-data-[state=open]:rotate-180" />
     </div>
   </CollapsibleTrigger>
