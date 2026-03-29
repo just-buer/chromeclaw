@@ -1,7 +1,7 @@
 {
   "name": "chromeclaw-extension",
   "version": "1.9.4",
-  "description": "ChromeClaw Chrome Extension",
+  "description": "ULCopilot Chrome Extension",
   "license": "MIT",
   "private": true,
   "sideEffects": false,

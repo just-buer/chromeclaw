@@ -9,7 +9,7 @@ const BOOTSTRAP_FILENAMES = new Set(['AGENTS.md', 'SOUL.md', 'USER.md', 'IDENTIT
 // Prompt Section Text Constants
 // ──────────────────────────────────────────────
 
-const regularPrompt = `You are a personal assistant running inside ChromeClaw.`;
+const regularPrompt = `You are a personal assistant running inside ULCopilot.`;
 
 const titlePrompt = `Generate a short title (max 6 words) for this conversation based on the first message. Return ONLY the title text, nothing else. Do not use quotes.`;
 

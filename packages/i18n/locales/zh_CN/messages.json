@@ -1,15 +1,15 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "ChromeClaw - 浏览器中的个人AI助手。任何操作系统，任何平台。🦞"
+    "message": "ULCopilot - 浏览器中的个人AI助手。任何操作系统，任何平台。🦞"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "ChromeClaw - 浏览器中的个人AI助手 🦞"
+    "message": "ULCopilot - 浏览器中的个人AI助手 🦞"
   },
   "extensionShortName": {
     "description": "Short extension name for Firefox (max 50 chars)",
-    "message": "ChromeClaw - 你的个人浏览器AI助手 🦞"
+    "message": "ULCopilot - 你的个人浏览器AI助手 🦞"
   },
   "displayErrorInfo": {
     "message": "发生错误"
@@ -27,7 +27,7 @@
     "message": "重新运行"
   },
   "firstRun_welcome": {
-    "message": "欢迎使用 ChromeClaw"
+    "message": "欢迎使用 ULCopilot"
   },
   "firstRun_addApiKey": {
     "message": "添加您的 API 密钥以开始聊天"
@@ -827,7 +827,7 @@
     "message": "导入 ZIP"
   },
   "optionsPage_title": {
-    "message": "ChromeClaw 设置"
+    "message": "ULCopilot 设置"
   },
   "provider_openai": {
     "message": "OpenAI"
@@ -1288,10 +1288,10 @@
   "community_title": { "message": "社区" },
   "community_description": { "message": "加入我们的社区，分享反馈、获取帮助，与其他用户交流想法。" },
   "community_discordTitle": { "message": "Discord 服务器" },
-  "community_discordDescription": { "message": "与社区交流、报告问题、提出功能需求，获取其他 ChromeClaw 用户的帮助。" },
+  "community_discordDescription": { "message": "与社区交流、报告问题、提出功能需求，获取其他 ULCopilot 用户的帮助。" },
   "community_joinDiscord": { "message": "加入 Discord" },
-  "community_rateTitle": { "message": "为 ChromeClaw 评分" },
-  "community_rateDescription": { "message": "喜欢 ChromeClaw？在 Chrome 网上应用店留下评价，帮助更多人发现它。" },
+  "community_rateTitle": { "message": "为 ULCopilot 评分" },
+  "community_rateDescription": { "message": "喜欢 ULCopilot？在 Chrome 网上应用店留下评价，帮助更多人发现它。" },
   "community_leaveReview": { "message": "去评价" },
   "greeting_hello": { "message": "你好！" },
   "greeting_help": { "message": "今天我能帮你什么？" },

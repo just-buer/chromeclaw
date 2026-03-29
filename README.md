@@ -1,4 +1,4 @@
-# ChromeClaw
+# ULCopilot
 
 A lightweight [OpenClaw](https://github.com/openclaw)-inspired AI agent running entirely in the Chrome browser sandbox — with multi-provider LLM support, messaging channels (WhatsApp, Telegram), voice (TTS/STT), memory, agents, and browser automation.
 
@@ -9,7 +9,7 @@ A lightweight [OpenClaw](https://github.com/openclaw)-inspired AI agent running 
 
 ## Overview
 
-ChromeClaw brings the capabilities of a full AI agent platform into a Chrome extension that is super easy to install and set up — just load the extension, add an API key, and start chatting. No server, no Docker, no CLI. Protected by the modern browser sandbox and inspired by the [OpenClaw](https://github.com/openclaw) project, it delivers a lightweight, self-contained alternative that runs entirely in the browser's side panel. It supports multiple LLM providers (OpenAI, Anthropic, Google, OpenRouter, and any OpenAI-compatible endpoint) using your own API keys. Beyond chat, it connects to WhatsApp and Telegram as messaging channels, speaks and listens via local or cloud TTS/STT, and remembers context across sessions with a hybrid memory system.
+ULCopilot brings the capabilities of a full AI agent platform into a Chrome extension that is super easy to install and set up — just load the extension, add an API key, and start chatting. No server, no Docker, no CLI. Protected by the modern browser sandbox and inspired by the [OpenClaw](https://github.com/openclaw) project, it delivers a lightweight, self-contained alternative that runs entirely in the browser's side panel. It supports multiple LLM providers (OpenAI, Anthropic, Google, OpenRouter, and any OpenAI-compatible endpoint) using your own API keys. Beyond chat, it connects to WhatsApp and Telegram as messaging channels, speaks and listens via local or cloud TTS/STT, and remembers context across sessions with a hybrid memory system.
 
 ## Features
 
@@ -137,11 +137,11 @@ pnpm build
 
 ### Install from Chrome Web Store
 
-Install ChromeClaw directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme) — no build step required.
+Install ULCopilot directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/chromeclaw-your-own-perso/lnahopfgnfhcfchffbckmbbkopcmojme) — no build step required.
 
 ### Install from Firefox Add-ons
 
-Install ChromeClaw for Firefox from [Mozilla Add-ons](https://addons.mozilla.org/addon/chromeclaw/) — no build step required.
+Install ULCopilot for Firefox from [Mozilla Add-ons](https://addons.mozilla.org/addon/chromeclaw/) — no build step required.
 
 ### Load from Source
 
@@ -149,7 +149,7 @@ Install ChromeClaw for Firefox from [Mozilla Add-ons](https://addons.mozilla.org
 2. Enable **Developer mode** (top-right toggle)
 3. Click **Load unpacked**
 4. Select the `dist/` directory
-5. Open any page and click the ChromeClaw icon to open the side panel
+5. Open any page and click the ULCopilot icon to open the side panel
 
 ### First Run
 
@@ -256,7 +256,7 @@ Configurable quick-action buttons shown below the chat input. Managed on the Opt
 
 ## Channels
 
-ChromeClaw can send and receive messages on WhatsApp and Telegram. Channel workers run in a persistent offscreen document; inbound messages are routed through the agent system and replies are sent back via the same channel.
+ULCopilot can send and receive messages on WhatsApp and Telegram. Channel workers run in a persistent offscreen document; inbound messages are routed through the agent system and replies are sent back via the same channel.
 
 ### WhatsApp
 
@@ -374,7 +374,7 @@ MIT — see [LICENSE](LICENSE).
 - [Baileys](https://github.com/WhiskeySockets/Baileys) (`packages/baileys/`) — TypeScript/JavaScript API for WhatsApp Web by WhiskeySockets. Licensed under the [MIT License](https://github.com/WhiskeySockets/Baileys/blob/master/LICENSE).
 - [Vercel AI Chatbot](https://github.com/vercel/chatbot) — Chat UI components and patterns. Licensed under the [Apache License 2.0](https://github.com/vercel/chatbot/blob/main/LICENSE).
 - [Chrome Extension Boilerplate React Vite](https://github.com/nicedreamdo/nicedreamdo) — Extension scaffolding with React, Vite, and Turborepo by nicedreamdo. Licensed under the [MIT License](https://github.com/nicedreamdo/nicedreamdo/blob/main/LICENSE).
-- [OpenClaw](https://github.com/openclaw/openclaw) — Open-source AI agent platform that inspired ChromeClaw's architecture and capabilities.
+- [OpenClaw](https://github.com/openclaw/openclaw) — Open-source AI agent platform that inspired ULCopilot's architecture and capabilities.
 
 ## Star History
 

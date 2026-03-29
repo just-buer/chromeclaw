@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { ManifestParserImpl } from './impl.js';
 import type { ManifestType } from '@extension/shared';
 
-/** Minimal manifest matching ChromeClaw's actual manifest.ts structure */
+/** Minimal manifest matching ULCopilot's actual manifest.ts structure */
 const buildTestManifest = (overrides?: Partial<ManifestType>): ManifestType =>
   ({
     manifest_version: 3,

@@ -1,15 +1,15 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "ChromeClaw - ブラウザで使えるパーソナルAIアシスタント。あらゆるOS、あらゆるプラットフォームに対応。🦞"
+    "message": "ULCopilot - ブラウザで使えるパーソナルAIアシスタント。あらゆるOS、あらゆるプラットフォームに対応。🦞"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "ChromeClaw - ブラウザで使えるパーソナルAIアシスタント 🦞"
+    "message": "ULCopilot - ブラウザで使えるパーソナルAIアシスタント 🦞"
   },
   "extensionShortName": {
     "description": "Short extension name for Firefox (max 50 chars)",
-    "message": "ChromeClaw - ブラウザのAIアシスタント 🦞"
+    "message": "ULCopilot - ブラウザのAIアシスタント 🦞"
   },
   "displayErrorInfo": {
     "message": "エラーが発生しました"
@@ -27,7 +27,7 @@
     "message": "再実行"
   },
   "firstRun_welcome": {
-    "message": "ChromeClaw へようこそ"
+    "message": "ULCopilot へようこそ"
   },
   "firstRun_addApiKey": {
     "message": "API キーを追加してチャットを始めましょう"
@@ -783,7 +783,7 @@
     "message": "ZIP をインポート"
   },
   "optionsPage_title": {
-    "message": "ChromeClaw 設定"
+    "message": "ULCopilot 設定"
   },
   "provider_openai": {
     "message": "OpenAI"
@@ -1244,10 +1244,10 @@
   "community_title": { "message": "コミュニティ" },
   "community_description": { "message": "コミュニティに参加して、フィードバックの共有、ヘルプの取得、他のユーザーとのアイデア交換をしましょう。" },
   "community_discordTitle": { "message": "Discord サーバー" },
-  "community_discordDescription": { "message": "コミュニティとチャット、バグ報告、機能リクエスト、他の ChromeClaw ユーザーからのサポートを受けましょう。" },
+  "community_discordDescription": { "message": "コミュニティとチャット、バグ報告、機能リクエスト、他の ULCopilot ユーザーからのサポートを受けましょう。" },
   "community_joinDiscord": { "message": "Discord に参加" },
-  "community_rateTitle": { "message": "ChromeClaw を評価" },
-  "community_rateDescription": { "message": "ChromeClaw を気に入りましたか？Chrome ウェブストアでレビューを残して、他の人にも広めましょう。" },
+  "community_rateTitle": { "message": "ULCopilot を評価" },
+  "community_rateDescription": { "message": "ULCopilot を気に入りましたか？Chrome ウェブストアでレビューを残して、他の人にも広めましょう。" },
   "community_leaveReview": { "message": "レビューを書く" },
   "greeting_hello": { "message": "こんにちは！" },
   "greeting_help": { "message": "今日はどんなお手伝いができますか？" },

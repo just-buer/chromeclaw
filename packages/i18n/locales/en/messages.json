@@ -1,15 +1,15 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "ChromeClaw - Your own personal AI assistant in your browser. Any OS. Any Platform. 🦞"
+    "message": "ULCopilot - Your own personal AI assistant in your browser. Any OS. Any Platform. 🦞"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "ChromeClaw - Your own personal AI assistant in your browser. 🦞"
+    "message": "ULCopilot - Your own personal AI assistant in your browser. 🦞"
   },
   "extensionShortName": {
     "description": "Short extension name for Firefox (max 50 chars)",
-    "message": "ChromeClaw - Personal AI Assistant in Browser 🦞"
+    "message": "ULCopilot - Personal AI Assistant in Browser 🦞"
   },
   "displayErrorInfo": {
     "message": "Error occur"
@@ -27,7 +27,7 @@
     "message": "Run Again"
   },
   "firstRun_welcome": {
-    "message": "Welcome to ChromeClaw"
+    "message": "Welcome to ULCopilot"
   },
   "firstRun_addApiKey": {
     "message": "Add your API key to start chatting"
@@ -896,7 +896,7 @@
     "message": "Import ZIP"
   },
   "optionsPage_title": {
-    "message": "ChromeClaw Settings"
+    "message": "ULCopilot Settings"
   },
   "provider_openai": {
     "message": "OpenAI"
@@ -1067,16 +1067,16 @@
     "message": "Discord Server"
   },
   "community_discordDescription": {
-    "message": "Chat with the community, report bugs, request features, and get help from other ChromeClaw users."
+    "message": "Chat with the community, report bugs, request features, and get help from other ULCopilot users."
   },
   "community_joinDiscord": {
     "message": "Join Discord"
   },
   "community_rateTitle": {
-    "message": "Rate ChromeClaw"
+    "message": "Rate ULCopilot"
   },
   "community_rateDescription": {
-    "message": "Enjoying ChromeClaw? Leave a review on the Chrome Web Store to help others discover it."
+    "message": "Enjoying ULCopilot? Leave a review on the Chrome Web Store to help others discover it."
   },
   "community_leaveReview": {
     "message": "Leave a Review"

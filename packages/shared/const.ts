@@ -1,1 +1,1 @@
-export const APP_NAME = 'ChromeClaw' as const;
+export const APP_NAME = 'ULCopilot' as const;

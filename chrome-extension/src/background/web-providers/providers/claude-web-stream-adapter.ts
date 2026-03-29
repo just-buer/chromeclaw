@@ -11,7 +11,7 @@
  *    always active. When the model uses native tool calling, we receive `tool_use`
  *    content blocks with `input_json_delta` streaming, followed by `tool_result`
  *    blocks (usually `is_error: true` since claude.ai can't execute them properly).
- *    We CONVERT native tool_use blocks into XML `<tool_call>` format so ChromeClaw
+ *    We CONVERT native tool_use blocks into XML `<tool_call>` format so ULCopilot
  *    can execute them, then signal abort so the subsequent text (which is based on
  *    the failed native result) gets discarded.
  * 5. `tool_result` blocks from claude.ai's native execution are ignored entirely.

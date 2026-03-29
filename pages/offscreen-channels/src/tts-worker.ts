@@ -253,7 +253,7 @@ const muxToOgg = (packets: Uint8Array[], sampleRate: number): ArrayBuffer => {
   granulePos = 0n;
 
   // Page 2: OpusTags (comment header)
-  const vendor = 'ChromeClaw';
+  const vendor = 'ULCopilot';
   const tagsSize = 8 + 4 + vendor.length + 4; // 'OpusTags' + vendorLen + vendor + commentCount
   const opusTags = new Uint8Array(tagsSize);
   const tagsView = new DataView(opusTags.buffer);

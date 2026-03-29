@@ -1,15 +1,15 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "ChromeClaw - Jouw persoonlijke AI-assistent in je browser. Elk besturingssysteem. Elk platform. 🦞"
+    "message": "ULCopilot - Jouw persoonlijke AI-assistent in je browser. Elk besturingssysteem. Elk platform. 🦞"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "ChromeClaw - Jouw persoonlijke AI-assistent in je browser. 🦞"
+    "message": "ULCopilot - Jouw persoonlijke AI-assistent in je browser. 🦞"
   },
   "extensionShortName": {
     "description": "Short extension name for Firefox (max 50 chars)",
-    "message": "ChromeClaw - AI-assistent in je Browser 🦞"
+    "message": "ULCopilot - AI-assistent in je Browser 🦞"
   },
   "displayErrorInfo": {
     "message": "Fout opgetreden"
@@ -27,7 +27,7 @@
     "message": "Opnieuw uitvoeren"
   },
   "firstRun_welcome": {
-    "message": "Welkom bij ChromeClaw"
+    "message": "Welkom bij ULCopilot"
   },
   "firstRun_addApiKey": {
     "message": "Voeg je API-sleutel toe om te beginnen met chatten"
@@ -783,7 +783,7 @@
     "message": "ZIP importeren"
   },
   "optionsPage_title": {
-    "message": "ChromeClaw Instellingen"
+    "message": "ULCopilot Instellingen"
   },
   "provider_openai": {
     "message": "OpenAI"
@@ -1244,10 +1244,10 @@
   "community_title": { "message": "Community" },
   "community_description": { "message": "Word lid van onze community om feedback te delen, hulp te krijgen en ideeën te bespreken met andere gebruikers." },
   "community_discordTitle": { "message": "Discord-server" },
-  "community_discordDescription": { "message": "Chat met de community, meld bugs, vraag functies aan en krijg hulp van andere ChromeClaw-gebruikers." },
+  "community_discordDescription": { "message": "Chat met de community, meld bugs, vraag functies aan en krijg hulp van andere ULCopilot-gebruikers." },
   "community_joinDiscord": { "message": "Discord bijtreden" },
-  "community_rateTitle": { "message": "Beoordeel ChromeClaw" },
-  "community_rateDescription": { "message": "Bevalt ChromeClaw? Laat een beoordeling achter in de Chrome Web Store zodat anderen het kunnen ontdekken." },
+  "community_rateTitle": { "message": "Beoordeel ULCopilot" },
+  "community_rateDescription": { "message": "Bevalt ULCopilot? Laat een beoordeling achter in de Chrome Web Store zodat anderen het kunnen ontdekken." },
   "community_leaveReview": { "message": "Beoordeling achterlaten" },
   "greeting_hello": { "message": "Hallo!" },
   "greeting_help": { "message": "Hoe kan ik je vandaag helpen?" },

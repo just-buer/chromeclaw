@@ -2,7 +2,7 @@
 
 ## Context
 
-ChromeClaw's build system already supports Firefox (`IS_FIREFOX`, manifest conversion, `.xpi` packaging). Test files for Firefox behavior already exist but **all fail** because the runtime code hasn't been adapted yet. This plan implements the actual Firefox runtime compatibility per the design in `~/dev/FIREFOX_COMPATIBILITY_DESIGN.md`.
+ULCopilot's build system already supports Firefox (`IS_FIREFOX`, manifest conversion, `.xpi` packaging). Test files for Firefox behavior already exist but **all fail** because the runtime code hasn't been adapted yet. This plan implements the actual Firefox runtime compatibility per the design in `~/dev/FIREFOX_COMPATIBILITY_DESIGN.md`.
 
 **Approach:** Use existing `webextension-polyfill` for standard APIs (~350 call sites). For Chrome-only APIs, prefer **feature detection** and **dependency injection** over `IS_FIREFOX` branching. Isolate the few unavoidable browser-specific checks into small utility modules so business logic stays browser-agnostic.
 

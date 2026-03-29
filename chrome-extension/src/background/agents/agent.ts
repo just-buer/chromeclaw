@@ -1,6 +1,6 @@
 /**
  * Agent class — local wrapper that uses the local agent-loop.ts (with
- * ChromeClaw error guard) instead of the npm version.
+ * ULCopilot error guard) instead of the npm version.
  */
 
 import { agentLoop, agentLoopContinue } from './agent-loop';

@@ -51,10 +51,10 @@ test.describe('Direct Mode @phase-9', () => {
     await page.close();
   });
 
-  test('MVP-19: extension branded as ChromeClaw', async ({ extensionId, context }) => {
+  test('MVP-19: extension branded as ULCopilot', async ({ extensionId, context }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/side-panel/index.html`);
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
 
     await page.close();
   });

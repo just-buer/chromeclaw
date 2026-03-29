@@ -179,7 +179,7 @@ const handleChannelMessageInner = async (
         channelLog.warn('No model configured, skipping channel message');
         await adapter.sendMessage({
           to: msg.channelChatId,
-          text: 'No AI model is configured. Please set up a model in ChromeClaw settings.',
+          text: 'No AI model is configured. Please set up a model in ULCopilot settings.',
         });
         return;
       }

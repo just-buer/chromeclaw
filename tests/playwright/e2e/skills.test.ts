@@ -13,7 +13,7 @@ const openSkillsTab = async (page: Page, extensionId: string) => {
   // Now navigate to Options > Skills tab
   await page.goto(`chrome-extension://${extensionId}/options/index.html`);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
   await page.locator('nav button', { hasText: 'Skills' }).click();
   await expect(page.locator('button', { hasText: 'New Skill' })).toBeVisible({ timeout: 10000 });
   // Wait for skills to load from IndexedDB

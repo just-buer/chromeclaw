@@ -67,7 +67,7 @@ export const setupFullPageChat = async (page: Page, extensionId: string) => {
 export const openChannelsTab = async (page: Page, extensionId: string) => {
   await page.goto(`chrome-extension://${extensionId}/options/index.html`);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
   await page.locator('nav button', { hasText: 'Channels' }).click();
   await expect(page.getByText('Telegram Bot', { exact: true })).toBeVisible({ timeout: 10000 });
 };

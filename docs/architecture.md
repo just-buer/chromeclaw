@@ -1,8 +1,8 @@
-# ChromeClaw 技术方案文档
+# ULCopilot 技术方案文档
 
 ## 1. 项目定位
 
-ChromeClaw 是一个 **Chrome/Firefox 浏览器扩展**，核心能力：
+ULCopilot 是一个 **Chrome/Firefox 浏览器扩展**，核心能力：
 
 - 侧边栏 AI 聊天（支持 OpenAI、Anthropic、Google、OpenRouter、自定义模型）
 - 多 Agent 人格，每个 Agent 有独立工作区文件、记忆、模型配置

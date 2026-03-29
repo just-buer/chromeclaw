@@ -6,7 +6,7 @@
 // '@mariozechner/pi-ai' instead of from this barrel to avoid triggering
 // chrome/storage initialization.
 //
-// Local — ChromeClaw error guard wrappers
+// Local — ULCopilot error guard wrappers
 export { Agent } from './agent';
 export type { AgentOptions } from './agent';
 export { agentLoop, agentLoopContinue } from './agent-loop';

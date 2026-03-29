@@ -1,13 +1,13 @@
 const SKILL_CREATOR_SKILL = `---
 name: Skill Creator
-description: Create or update ChromeClaw skills. Use when the user wants to design,
+description: Create or update ULCopilot skills. Use when the user wants to design,
   build, edit, or improve a skill, or when asked to make a reusable prompt template
   for a specific task or domain.
 ---
 
 # Skill Creator
 
-Guide for creating effective ChromeClaw skills.
+Guide for creating effective ULCopilot skills.
 
 ## What Skills Are
 

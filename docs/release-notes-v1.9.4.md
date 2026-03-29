@@ -1,4 +1,4 @@
-# ChromeClaw v1.9.4 Release Notes
+# ULCopilot v1.9.4 Release Notes
 
 ## Browser Tool Reliability
 

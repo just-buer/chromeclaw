@@ -15,7 +15,7 @@ test.describe('@phase-3 Extension loads', () => {
     await page.goto(`chrome-extension://${extensionId}/side-panel/index.html`);
 
     // Side panel should load without error
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
 
     // Should show either the auth form or the chat UI (depending on mode)
     const body = page.locator('body');

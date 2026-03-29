@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 const openOptions = async (page: Page, extensionId: string) => {
   await page.goto(`chrome-extension://${extensionId}/options/index.html`);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
 };
 
 /** Click a tab in the options page nav. */

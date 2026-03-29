@@ -64,7 +64,7 @@ const handleBotCommand = async (msg: ChannelInboundMessage, botToken: string): P
 const handleStart = async (msg: ChannelInboundMessage, botToken: string): Promise<void> => {
   const name = msg.senderName ?? 'there';
   const text =
-    `Hello ${name}! I'm your ChromeClaw AI assistant.\n\n` +
+    `Hello ${name}! I'm your ULCopilot AI assistant.\n\n` +
     `Send me any message and I'll respond using your configured AI model. ` +
     `You can also send voice notes and I'll transcribe them.\n\n` +
     `Use /help to see available commands.`;

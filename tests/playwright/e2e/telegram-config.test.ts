@@ -36,7 +36,7 @@ test.describe('Telegram Channel Config @phase-10', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options/index.html`);
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
 
     // General tab (default) — no Telegram card
     await expect(page.locator('[data-testid="tg-status-dot"]')).not.toBeVisible();
@@ -245,7 +245,7 @@ test.describe('Telegram Channel Config @phase-10', () => {
     // Reload and navigate back
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
     await page.locator('nav button', { hasText: 'Channels' }).click();
     await expect(page.getByText('Telegram Bot', { exact: true })).toBeVisible({ timeout: 10000 });
 

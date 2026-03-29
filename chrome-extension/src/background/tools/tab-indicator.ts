@@ -1,6 +1,6 @@
 /**
  * Visual tab indicator — shows an indigo outline around the viewport
- * while ChromeClaw tools are actively interacting with a tab.
+ * while ULCopilot tools are actively interacting with a tab.
  *
  * Uses chrome.scripting.insertCSS/removeCSS (no CDP required).
  * Reference-counted so overlapping/sequential tool calls on the same

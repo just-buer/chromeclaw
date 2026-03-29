@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 const openOptions = async (page: Page, extensionId: string) => {
   await page.goto(`chrome-extension://${extensionId}/options/index.html`);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
 };
 
 /** Click a tab in the options page nav. */
@@ -55,7 +55,7 @@ test.describe('Tool Config @phase-10', () => {
     // Reload and verify still off
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
     await clickTab(page, 'Tool');
     await expect(browserCheckbox).not.toBeChecked();
 
@@ -66,7 +66,7 @@ test.describe('Tool Config @phase-10', () => {
     // Reload and verify still on
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
     await clickTab(page, 'Tool');
     await expect(browserCheckbox).toBeChecked();
 

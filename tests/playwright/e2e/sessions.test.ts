@@ -8,7 +8,7 @@ test.describe('Session Management', () => {
     await sidePanel.navigate();
 
     // The page should load — session restore happens automatically
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
     const body = page.locator('body');
     await expect(body).toBeVisible();
 
@@ -63,7 +63,7 @@ test.describe('Context Compaction', () => {
     await sidePanel.waitForLoad();
 
     // Smoke test — page loads and input is accessible
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
     const input = page.locator('textarea').last();
     await expect(input).toBeVisible();
 
@@ -79,7 +79,7 @@ test.describe('Context Compaction', () => {
     await sidePanel.navigate();
 
     // Smoke test — the page loads without crashing
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
     const body = page.locator('body');
     await expect(body).toBeVisible();
 
@@ -94,7 +94,7 @@ test.describe('Token Usage', () => {
     await sidePanel.navigate();
 
     // Badge may not show until first message is sent, so just verify page loads
-    await expect(page).toHaveTitle('ChromeClaw');
+    await expect(page).toHaveTitle('ULCopilot');
     const body = page.locator('body');
     await expect(body).toBeVisible();
 

@@ -1,8 +1,8 @@
-# ChromeClaw — Terms of Use & Privacy
+# ULCopilot — Terms of Use & Privacy
 
 **Last updated:** March 13, 2026
 
-ChromeClaw is an open-source Chrome extension that provides AI chat in the browser's side panel with multi-provider LLM support. Source code: [github.com/algopian/chromeclaw](https://github.com/algopian/chromeclaw)
+ULCopilot is an open-source Chrome extension that provides AI chat in the browser's side panel with multi-provider LLM support. Source code: [github.com/algopian/chromeclaw](https://github.com/algopian/chromeclaw)
 
 ---
 
@@ -28,7 +28,7 @@ All data processing happens locally in your browser. Data is only sent to extern
 
 ### 2.2 Permissions Explained
 
-ChromeClaw requests the following browser permissions:
+ULCopilot requests the following browser permissions:
 
 | Permission | Why it's needed |
 |---|---|
@@ -57,9 +57,9 @@ No data is synced to any cloud service. No data leaves your browser unless you e
 
 The following features are entirely optional and only activated by your explicit configuration:
 
-- **Google OAuth (Gmail, Calendar, Drive):** If you configure a Google Cloud client ID and authorize access, ChromeClaw communicates directly with Google APIs using OAuth2 tokens obtained via `chrome.identity`. ChromeClaw does not proxy or store Google data beyond what is needed for the current operation. Google's [Privacy Policy](https://policies.google.com/privacy) and [Terms of Service](https://policies.google.com/terms) apply.
-- **Telegram channel:** If configured, ChromeClaw polls the Telegram Bot API for messages using your bot token and routes them through your configured LLM provider. Telegram's [Privacy Policy](https://telegram.org/privacy) applies.
-- **WhatsApp channel:** If configured, ChromeClaw connects to WhatsApp Web to receive and send messages, routing them through your configured LLM provider. WhatsApp's [Privacy Policy](https://www.whatsapp.com/legal/privacy-policy) applies.
+- **Google OAuth (Gmail, Calendar, Drive):** If you configure a Google Cloud client ID and authorize access, ULCopilot communicates directly with Google APIs using OAuth2 tokens obtained via `chrome.identity`. ULCopilot does not proxy or store Google data beyond what is needed for the current operation. Google's [Privacy Policy](https://policies.google.com/privacy) and [Terms of Service](https://policies.google.com/terms) apply.
+- **Telegram channel:** If configured, ULCopilot polls the Telegram Bot API for messages using your bot token and routes them through your configured LLM provider. Telegram's [Privacy Policy](https://telegram.org/privacy) applies.
+- **WhatsApp channel:** If configured, ULCopilot connects to WhatsApp Web to receive and send messages, routing them through your configured LLM provider. WhatsApp's [Privacy Policy](https://www.whatsapp.com/legal/privacy-policy) applies.
 - **Text-to-Speech (TTS):** Audio can be generated locally via Kokoro (runs in-browser) or sent to OpenAI's TTS API based on your configuration. When using OpenAI TTS, text is sent to OpenAI's servers. OpenAI's [Privacy Policy](https://openai.com/privacy) applies.
 
 ### 2.5 Your Control
@@ -72,7 +72,7 @@ The following features are entirely optional and only activated by your explicit
 
 ## 3. Age Requirement
 
-ChromeClaw does not have its own age requirement. However, you must comply with the age requirements and terms of service of any third-party LLM providers and services you use through this extension.
+ULCopilot does not have its own age requirement. However, you must comply with the age requirements and terms of service of any third-party LLM providers and services you use through this extension.
 
 ## 4. Changes
 

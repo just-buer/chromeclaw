@@ -7,7 +7,7 @@ const openOptions = async (page: Page, extensionId: string) => {
   await page.goto(`chrome-extension://${extensionId}/options/index.html`);
   await page.waitForLoadState('domcontentloaded');
   // Wait for the options page to render (h1 is always present)
-  await expect(page.locator('h1')).toContainText('ChromeClaw Settings', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('ULCopilot Settings', { timeout: 10000 });
 };
 
 /** Click a tab in the options page nav. */
@@ -21,7 +21,7 @@ test.describe('Options Page @phase-5', () => {
     await openOptions(page, extensionId);
 
     // Page title
-    await expect(page.locator('h1')).toContainText('ChromeClaw Settings');
+    await expect(page.locator('h1')).toContainText('ULCopilot Settings');
 
     // General tab is active by default — Settings card should be visible
     await expect(page.locator('text=Settings').first()).toBeVisible();

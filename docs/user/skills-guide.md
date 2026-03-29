@@ -30,7 +30,7 @@
 
 ## 3. 内置 Skills
 
-ChromeClaw 预置了 3 个 Skill，默认处于禁用状态。你可以在设置页面将它们启用：
+ULCopilot 预置了 3 个 Skill，默认处于禁用状态。你可以在设置页面将它们启用：
 
 ### Daily Journal（每日日记）
 
@@ -181,7 +181,7 @@ description: Write structured weekly work reports. Use when the user asks to wri
 当 description 较长时，可以用缩进续行（YAML 多行字符串）：
 
 ```yaml
-description: Create or update ChromeClaw skills. Use when the user wants to design,
+description: Create or update ULCopilot skills. Use when the user wants to design,
   build, edit, or improve a skill, or when asked to make a reusable prompt template
   for a specific task or domain.
 ```

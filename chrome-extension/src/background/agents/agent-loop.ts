@@ -1,6 +1,6 @@
 /**
  * Agent loop — local wrapper around pi-agent-core's agent loop logic.
- * Kept locally for ChromeClaw-specific error guard: the async IIFEs in
+ * Kept locally for ULCopilot-specific error guard: the async IIFEs in
  * agentLoop/agentLoopContinue wrap runLoop in try/catch to guarantee
  * stream.end() fires on unhandled errors, preventing service worker hangs.
  */

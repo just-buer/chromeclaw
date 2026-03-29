@@ -89,7 +89,7 @@ const getRunningCount = (): number => {
 // ── System Prompt Builder ──────────────────────────
 
 const SUBAGENT_IDENTITY =
-  'You are a focused task assistant running as a subagent inside ChromeClaw.\n' +
+  'You are a focused task assistant running as a subagent inside ULCopilot.\n' +
   'Your sole purpose is to complete the assigned task thoroughly and return your findings.';
 
 const buildSubagentContext = (task: string): string => `## Subagent Context

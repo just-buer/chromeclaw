@@ -1,15 +1,15 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. Jedes OS. Jede Plattform. 🦞"
+    "message": "ULCopilot – Dein persönlicher KI-Assistent im Browser. Jedes OS. Jede Plattform. 🦞"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "ChromeClaw – Dein persönlicher KI-Assistent im Browser. 🦞"
+    "message": "ULCopilot – Dein persönlicher KI-Assistent im Browser. 🦞"
   },
   "extensionShortName": {
     "description": "Short extension name for Firefox (max 50 chars)",
-    "message": "ChromeClaw – KI-Assistent im Browser 🦞"
+    "message": "ULCopilot – KI-Assistent im Browser 🦞"
   },
   "displayErrorInfo": {
     "message": "Fehler aufgetreten"
@@ -27,7 +27,7 @@
     "message": "Erneut ausführen"
   },
   "firstRun_welcome": {
-    "message": "Willkommen bei ChromeClaw"
+    "message": "Willkommen bei ULCopilot"
   },
   "firstRun_addApiKey": {
     "message": "Füge deinen API-Schlüssel hinzu, um zu chatten"
@@ -783,7 +783,7 @@
     "message": "ZIP importieren"
   },
   "optionsPage_title": {
-    "message": "ChromeClaw-Einstellungen"
+    "message": "ULCopilot-Einstellungen"
   },
   "provider_openai": {
     "message": "OpenAI"
@@ -1244,10 +1244,10 @@
   "community_title": { "message": "Community" },
   "community_description": { "message": "Tritt unserer Community bei, um Feedback zu teilen, Hilfe zu erhalten und Ideen mit anderen Nutzern auszutauschen." },
   "community_discordTitle": { "message": "Discord-Server" },
-  "community_discordDescription": { "message": "Chatte mit der Community, melde Fehler, schlage Funktionen vor und erhalte Hilfe von anderen ChromeClaw-Nutzern." },
+  "community_discordDescription": { "message": "Chatte mit der Community, melde Fehler, schlage Funktionen vor und erhalte Hilfe von anderen ULCopilot-Nutzern." },
   "community_joinDiscord": { "message": "Discord beitreten" },
-  "community_rateTitle": { "message": "ChromeClaw bewerten" },
-  "community_rateDescription": { "message": "Gefällt dir ChromeClaw? Hinterlasse eine Bewertung im Chrome Web Store, damit andere es entdecken können." },
+  "community_rateTitle": { "message": "ULCopilot bewerten" },
+  "community_rateDescription": { "message": "Gefällt dir ULCopilot? Hinterlasse eine Bewertung im Chrome Web Store, damit andere es entdecken können." },
   "community_leaveReview": { "message": "Bewertung abgeben" },
   "greeting_hello": { "message": "Hallo!" },
   "greeting_help": { "message": "Wie kann ich dir heute helfen?" },

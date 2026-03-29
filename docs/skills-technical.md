@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-**Skills** 是 ChromeClaw 扩展的可插拔指令模板系统，允许用户和 AI 将特定任务的程序化知识编码为 Markdown 文件，在对话中按需注入给 LLM。
+**Skills** 是 ULCopilot 扩展的可插拔指令模板系统，允许用户和 AI 将特定任务的程序化知识编码为 Markdown 文件，在对话中按需注入给 LLM。
 
 核心设计目标：
 

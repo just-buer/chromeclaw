@@ -6,7 +6,7 @@ Zero API keys, zero cost — uses the user's existing browser sessions to access
 
 ## Problem
 
-ChromeClaw supports cloud LLM providers (via pi-mono SDK) and local models (via offscreen/transformers.js), both requiring API keys or local model downloads. Many users already have active sessions on provider websites (claude.ai, chatglm.cn, etc.). Web providers let them use those sessions directly.
+ULCopilot supports cloud LLM providers (via pi-mono SDK) and local models (via offscreen/transformers.js), both requiring API keys or local model downloads. Many users already have active sessions on provider websites (claude.ai, chatglm.cn, etc.). Web providers let them use those sessions directly.
 
 ## How It Fits
 
@@ -24,7 +24,7 @@ All three return `AssistantMessageEventStream`. The agent loop, stream-handler, 
 
 ### Chrome Extension Advantage
 
-ChromeClaw IS the browser — no Playwright, no CDP browser launch needed.
+ULCopilot IS the browser — no Playwright, no CDP browser launch needed.
 
 - `chrome.cookies` API for session detection
 - `chrome.scripting.executeScript()` for credentialed fetch in tab context
@@ -459,7 +459,7 @@ Pick the provider website (e.g. `https://chat.deepseek.com`). You need:
 5. Look for the streaming request — usually the largest/longest one
 
 #### Option B: CDP Network Domain (more reliable)
-Use ChromeClaw's own debugger tool or a CDP script:
+Use ULCopilot's own debugger tool or a CDP script:
 ```js
 // Attach to the provider tab
 debugger({ action: "attach", tabId: <tabId> })

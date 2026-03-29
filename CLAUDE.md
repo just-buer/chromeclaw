@@ -1,8 +1,8 @@
-# CLAUDE.md — ChromeClaw Extension
+# CLAUDE.md — ULCopilot Extension
 
 ## What is this project?
 
-ChromeClaw is a Chrome extension that provides AI chat in the browser's side panel with multi-provider LLM support. Built with React 19, TypeScript, and pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent-core`). Users add their own API keys — no login or proxy required.
+ULCopilot is a Chrome extension that provides AI chat in the browser's side panel with multi-provider LLM support. Built with React 19, TypeScript, and pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent-core`). Users add their own API keys — no login or proxy required.
 
 ## Monorepo layout
 
