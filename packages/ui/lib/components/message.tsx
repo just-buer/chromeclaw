@@ -11,7 +11,8 @@ import { PreviewAttachment } from './preview-attachment';
 import { SearchResults, parseSearchResults } from './search-results';
 import { isDocumentToolCall } from '../artifact-stream';
 import { cn } from '../utils';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { toast } from 'sonner';
 import type {
   ChatMessage,
   ChatMessagePart,
@@ -246,10 +247,26 @@ type ToolCallPartProps = {
   onDeny?: (toolCallId: string, reason: string) => void;
 };
 
-const ToolCallPart = ({ part, state, toolName, args, result, matchedRule, onApprove, onDeny }: ToolCallPartProps) => (
+const ToolCallPart = ({ part, state, toolName, args, result, matchedRule, onApprove, onDeny }: ToolCallPartProps) => {
+  const handleCopy = useCallback(() => {
+    const parts = [
+      `Tool: ${toolName}`,
+      `Parameters: ${JSON.stringify(args, null, 2)}`,
+      result != null
+        ? `Result: ${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}`
+        : null,
+    ];
+    navigator.clipboard.writeText(parts.filter(Boolean).join('\n\n')).then(() => {
+      toast.success('Copied to clipboard');
+    });
+  }, [toolName, args, result]);
+
+  const isComplete = state === 'output-available' || state === 'output-error';
+
+  return (
   <div className="w-full" key={part.toolCallId}>
     <Tool className="w-full" defaultOpen={true}>
-      <ToolHeader name={toolName} state={state} />
+      <ToolHeader name={toolName} onCopy={isComplete ? handleCopy : undefined} state={state} />
       <ToolContent>
         {(state === 'input-available' || state === 'pending-approval' || state === 'output-available' || state === 'output-error') && (
           <ToolInput input={args} />
@@ -303,7 +320,8 @@ const ToolCallPart = ({ part, state, toolName, args, result, matchedRule, onAppr
       </ToolContent>
     </Tool>
   </div>
-);
+  );
+};
 
 const ToolResultRenderer = ({ toolName, result }: { toolName: string; result: unknown }) => {
   if (toolName === 'web_search') {
