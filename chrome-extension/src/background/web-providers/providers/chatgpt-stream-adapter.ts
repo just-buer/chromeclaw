@@ -83,6 +83,10 @@ const createChatGPTStreamAdapter = (): SseStreamAdapter => {
       const delta = fullText.slice(accumulatedLength);
       accumulatedLength = fullText.length;
 
+      // Valid content arrived — clear any stale error so it doesn't mask
+      // real issues in onFinish when fullText ends up empty after stripping.
+      lastError = undefined;
+
       const cleaned = stripChatGPTEntities(delta);
       return cleaned ? { feedText: cleaned } : null;
     },

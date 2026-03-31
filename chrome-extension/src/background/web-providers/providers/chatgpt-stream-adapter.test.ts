@@ -310,4 +310,70 @@ describe('createChatGPTStreamAdapter', () => {
       });
     });
   });
+
+  describe('lastError clearing', () => {
+    it('clears lastError when valid content arrives after an error event', () => {
+      const adapter = createChatGPTStreamAdapter();
+
+      // Simulate error event
+      const errorEvent = {
+        message: null,
+        error: 'Rate limit reached',
+      };
+      adapter.processEvent({ parsed: errorEvent, delta: null });
+
+      // Simulate valid assistant content arriving
+      adapter.processEvent({ parsed: assistantEvent('Hello!'), delta: null });
+
+      // onFinish with empty fullText should NOT show the stale error
+      // (fullText is empty because e.g. entity stripping removed all content)
+      const result = adapter.onFinish?.({
+        hasToolCalls: false,
+        fullText: '',
+        thinkingContent: undefined,
+      });
+      // lastError was cleared by valid content, so we get the generic message
+      expect(result).toEqual({
+        error: 'Empty response from ChatGPT. Please verify your ChatGPT session is active and try again.',
+      });
+    });
+
+    it('preserves lastError when no valid content arrives after error', () => {
+      const adapter = createChatGPTStreamAdapter();
+
+      // Simulate error event
+      const errorEvent = {
+        message: null,
+        error: 'You have been rate limited',
+      };
+      adapter.processEvent({ parsed: errorEvent, delta: null });
+
+      // No valid content follows — just system/empty events
+      adapter.processEvent({ parsed: systemEvent(), delta: null });
+      adapter.processEvent({ parsed: emptyEvent(), delta: null });
+
+      const result = adapter.onFinish?.({
+        hasToolCalls: false,
+        fullText: '',
+        thinkingContent: undefined,
+      });
+      expect(result).toEqual({
+        error: 'ChatGPT: You have been rate limited',
+      });
+    });
+
+    it('uses the latest error when multiple error events arrive without content', () => {
+      const adapter = createChatGPTStreamAdapter();
+
+      adapter.processEvent({ parsed: { message: null, error: 'First error' }, delta: null });
+      adapter.processEvent({ parsed: { message: null, error: 'Second error' }, delta: null });
+
+      const result = adapter.onFinish?.({
+        hasToolCalls: false,
+        fullText: '',
+        thinkingContent: undefined,
+      });
+      expect(result).toEqual({ error: 'ChatGPT: Second error' });
+    });
+  });
 });

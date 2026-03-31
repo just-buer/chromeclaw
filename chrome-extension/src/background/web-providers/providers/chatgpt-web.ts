@@ -45,7 +45,7 @@ const chatgptWeb: WebProviderDefinition = {
         }
       },
     });
-    const token = results?.[0]?.result as string | null;
+    const token = (results?.[0]?.result ?? null) as string | null;
     return token ? { token } : null;
   },
   buildRequest: opts => {
@@ -61,7 +61,7 @@ const chatgptWeb: WebProviderDefinition = {
         headers: { 'Content-Type': 'application/json' },
         // Lightweight body — real request is built in MAIN world (content-fetch-main.ts)
         body: JSON.stringify({ prompt, chatId }),
-        credentials: 'include' as RequestCredentials,
+        credentials: 'include',
       },
     };
   },

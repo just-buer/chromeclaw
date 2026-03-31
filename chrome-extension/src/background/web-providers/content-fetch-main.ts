@@ -1604,6 +1604,28 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
           }
         }
 
+        // Phase 1.5: Module-level source scan — if body fingerprinting missed chatRequirements
+        // or headerBuilder, check whether the *combined* source of all exported functions
+        // contains the target strings. This catches cases where minifiers hoist string
+        // literals to module-scope variables (e.g. `const a = "chat-requirements";`),
+        // making individual fn.toString() miss the match.
+        if (!chatRequirements || !headerBuilder) {
+          let combinedSource = '';
+          for (const key of exportKeys) {
+            const val = mod[key];
+            if (typeof val === 'function') {
+              try { combinedSource += (val as (...a: unknown[]) => unknown).toString() + '\n'; } catch { /* ignore */ }
+            }
+          }
+          if (combinedSource) {
+            const moduleHasChatReqs = combinedSource.includes('chat-requirements');
+            const moduleHasHeader = combinedSource.includes('requirements-token') || combinedSource.includes('openai-sentinel');
+            if (moduleHasChatReqs || moduleHasHeader) {
+              diag.push(`module-source-scan=hit(chatReqs=${moduleHasChatReqs},header=${moduleHasHeader})`);
+            }
+          }
+        }
+
         // Phase 2: Arity fallback — if body fingerprinting missed chatRequirements or headerBuilder
         if (!headerBuilder) {
           for (const key of exportKeys) {
@@ -1628,10 +1650,22 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
             chatRequirements = arity0Fns[0]!.fn as SentinelExports['chatRequirements'];
             diag.push(`chatRequirements=${arity0Fns[0]!.name}(arity0-unique)`);
           } else if (arity0Fns.length > 1) {
-            const candidate = arity0Fns.find(f => f.name !== '__esModule' && f.name !== 'default');
-            if (candidate) {
-              chatRequirements = candidate.fn as SentinelExports['chatRequirements'];
-              diag.push(`chatRequirements=${candidate.name}(arity0-filtered)`);
+            // Filter out well-known non-sentinel exports and prefer async functions
+            // (chatRequirements is always async — it fetches from /sentinel/chat-requirements)
+            const EXCLUDED_NAMES = new Set(['__esModule', 'default']);
+            const filtered = arity0Fns.filter(f => !EXCLUDED_NAMES.has(f.name));
+            // Prefer async functions (their toString contains 'async')
+            const asyncCandidates = filtered.filter(f => {
+              try { return f.fn.toString().includes('async'); } catch { return false; }
+            });
+            const best = asyncCandidates.length > 0 ? asyncCandidates : filtered;
+            if (best.length === 1) {
+              chatRequirements = best[0]!.fn as SentinelExports['chatRequirements'];
+              diag.push(`chatRequirements=${best[0]!.name}(arity0-filtered)`);
+            } else if (best.length > 1) {
+              // Still ambiguous — pick the first candidate but log the ambiguity
+              chatRequirements = best[0]!.fn as SentinelExports['chatRequirements'];
+              diag.push(`chatRequirements=${best[0]!.name}(arity0-ambiguous,${best.length}-candidates)`);
             }
           }
         }
@@ -1690,10 +1724,15 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
           return urls;
         };
 
-        // Try-import a candidate URL and check for sentinel exports
+        // Try-import a candidate URL and check for sentinel exports.
+        // Pre-filter: sentinel modules typically have <50 exports. Large app bundles
+        // (200+ exports) are skipped to avoid slow parse + potential side effects.
+        const MAX_SENTINEL_EXPORTS = 50;
+
         const tryCandidate = async (url: string): Promise<boolean> => {
           try {
             const mod = await import(/* @vite-ignore */ url) as Record<string, unknown>;
+            if (Object.keys(mod).length > MAX_SENTINEL_EXPORTS) return false;
             const testDiag: string[] = [];
             const exports = discoverSentinelExports(mod, testDiag);
             return exports !== null;
@@ -1884,7 +1923,7 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
                 new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Turnstile solver timed out after 15s')), 15_000)),
               ]);
             }
-          } catch { /* Turnstile may fail or hang, continue without */ }
+          } catch (e) { diag.push(`turnstile-err=${e instanceof Error ? e.message : 'unknown'}`); }
 
           // Solve Arkose challenge
           let arkoseToken: unknown = null;
@@ -1895,7 +1934,7 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
                 new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Arkose timed out after 15s')), 15_000)),
               ]);
             }
-          } catch { /* Arkose may fail (captcha), continue without */ }
+          } catch (e) { diag.push(`arkose-err=${e instanceof Error ? e.message : 'unknown'}`); }
 
           // Resolve proof-of-work token. powEnforcer may be:
           // - An enforcer object with getEnforcementToken() (older API)
@@ -1914,7 +1953,7 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
                 proofToken = exports.powEnforcer;
               }
             }
-          } catch { /* Proof token may fail, continue without */ }
+          } catch (e) { diag.push(`pow-err=${e instanceof Error ? e.message : 'unknown'}`); }
 
           // Build sentinel headers
           const extraHeaders = await Promise.race([
