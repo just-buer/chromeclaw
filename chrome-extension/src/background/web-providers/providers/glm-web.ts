@@ -11,7 +11,7 @@ const glmWeb: WebProviderDefinition = {
   defaultModelId: 'glm-5',
   defaultModelName: 'GLM-5',
   supportsTools: true,
-  supportsReasoning: false,
+  supportsReasoning: true,
   contextWindow: 128_000,
   refreshAuth: opts => refreshGlmAuth({ ...opts, baseUrl: 'https://chatglm.cn' }),
   buildRequest: opts =>
