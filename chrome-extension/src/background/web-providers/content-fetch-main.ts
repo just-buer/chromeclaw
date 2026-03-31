@@ -1515,118 +1515,433 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
 
       const cgHeaders = baseHeaders(accessToken, deviceId);
 
-      // ── Step 3: Warmup Sentinel endpoints (must complete BEFORE challenge solving) ──
-      // These prime server-side sentinel state; skipping them causes 403 "unusual activity".
-      try { await fetch('https://chatgpt.com/backend-api/conversation/init', {
-        method: 'POST', headers: cgHeaders, body: '{}', credentials: 'include',
-      }); } catch { /* ignore */ }
-      try { await fetch('https://chatgpt.com/backend-api/sentinel/chat-requirements/prepare', {
-        method: 'POST', headers: cgHeaders, body: '{}', credentials: 'include',
-      }); } catch { /* ignore */ }
-      try { await fetch('https://chatgpt.com/backend-api/sentinel/chat-requirements/finalize', {
-        method: 'POST', headers: cgHeaders, body: '{}', credentials: 'include',
-      }); } catch { /* ignore */ }
+      // ── Sentinel module discovery & auto-fingerprinting ──
+      // The sentinel module's export names are minified and rotate on each OpenAI
+      // deploy. Instead of hardcoding names, we discover functions by structural
+      // signature (arity, shape) with a fast-path for currently known names.
 
-      // ── Step 4: Sentinel antibot challenge solving ──
-      // ChatGPT uses oaistatic.com scripts for Turnstile, Arkose, and proof tokens.
-      // Dynamic import works because we're in MAIN world (page context).
-      // The function names are minified and may change — currently known as:
-      //   bk() = chat-requirements, bi() = turnstile solver,
-      //   bl = arkose enforcer, bm = proof enforcer, fX() = build extra headers
-      let sentinelHeaders: Record<string, string> = {};
-      let sentinelError = '';
-      try {
-        // Wait up to 10s for the oaistatic sentinel script to appear in the DOM.
-        // The page may still be loading scripts; using the live DOM script ensures
-        // the tokens match the current page session (stale CDN fallbacks cause 403).
-        let assetSrc: string | undefined;
-        for (let i = 0; i < 20; i++) {
-          assetSrc = Array.from(document.scripts)
-            .map(s => s.src)
-            .find(s => s?.includes('oaistatic.com') && s.endsWith('.js'));
-          if (assetSrc) break;
-          await new Promise(r => setTimeout(r, 500));
+      interface SentinelExports {
+        chatRequirements: () => Promise<Record<string, unknown>>;
+        turnstileSolver?: (key: unknown) => Promise<unknown>;
+        arkoseEnforcer?: { getEnforcementToken: (reqs: unknown) => Promise<unknown> };
+        powEnforcer?: unknown;  // enforcer object OR PoW solver {answers, ...}
+        headerBuilder: (...args: unknown[]) => Promise<Record<string, string>>;
+      }
+
+      const KNOWN_NAMES = { chatRequirements: 'bk', turnstileSolver: 'bi', arkoseEnforcer: 'bl', powEnforcer: 'bm', headerBuilder: 'fX' };
+
+      /** Discover sentinel function roles from module exports by structural fingerprinting. */
+      const discoverSentinelExports = (mod: Record<string, unknown>, diag: string[]): SentinelExports | null => {
+        // Fast path — check known minified names first
+        if (typeof mod[KNOWN_NAMES.chatRequirements] === 'function' && typeof mod[KNOWN_NAMES.headerBuilder] === 'function') {
+          diag.push('discovery=known-names');
+          return {
+            chatRequirements: mod[KNOWN_NAMES.chatRequirements] as SentinelExports['chatRequirements'],
+            turnstileSolver: typeof mod[KNOWN_NAMES.turnstileSolver] === 'function'
+              ? mod[KNOWN_NAMES.turnstileSolver] as SentinelExports['turnstileSolver']
+              : undefined,
+            arkoseEnforcer: mod[KNOWN_NAMES.arkoseEnforcer] && typeof (mod[KNOWN_NAMES.arkoseEnforcer] as Record<string, unknown>).getEnforcementToken === 'function'
+              ? mod[KNOWN_NAMES.arkoseEnforcer] as SentinelExports['arkoseEnforcer']
+              : undefined,
+            powEnforcer: mod[KNOWN_NAMES.powEnforcer] ?? undefined,
+            headerBuilder: mod[KNOWN_NAMES.headerBuilder] as SentinelExports['headerBuilder'],
+          };
         }
-        const assetUrl = assetSrc || 'https://cdn.oaistatic.com/assets/i5bamk05qmvsi6c3.js';
 
-        const sentinelModule = await import(/* @vite-ignore */ assetUrl);
+        // Fallback — scan all exports by function body content + structural shape.
+        // Minified function bodies still contain string literals (API paths, header
+        // names) that survive name rotations. We match on those first, then fall back
+        // to arity as a tie-breaker.
+        diag.push('discovery=fingerprint');
+        const exportKeys = Object.keys(mod);
+        diag.push(`exports=[${exportKeys.join(',')}]`);
 
-        if (typeof sentinelModule.bk !== 'function' || typeof sentinelModule.fX !== 'function') {
-          sentinelError = `Sentinel asset missing bk/fX exports (asset: ${assetUrl}). Function names may have been rotated.`;
-        } else {
-          const chatReqs = await Promise.race([
-            sentinelModule.bk(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('chat-requirements timed out after 15s')), 15_000)),
-          ]) as Record<string, unknown>;
-          const turnstileKey = chatReqs?.turnstile?.bx ?? chatReqs?.turnstile?.dx;
+        let chatRequirements: SentinelExports['chatRequirements'] | undefined;
+        let headerBuilder: SentinelExports['headerBuilder'] | undefined;
+        let turnstileSolver: SentinelExports['turnstileSolver'] | undefined;
+        let arkoseEnforcer: SentinelExports['arkoseEnforcer'] | undefined;
+        let powEnforcer: unknown;
 
-          if (!turnstileKey) {
-            sentinelError = 'Sentinel chat-requirements response missing turnstile key';
-          } else {
-            let turnstileToken: unknown = null;
-            try {
-              if (typeof sentinelModule.bi === 'function') {
-                turnstileToken = await Promise.race([
-                  sentinelModule.bi(turnstileKey),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Turnstile solver timed out after 15s')), 15_000)),
-                ]);
+        // Phase 1: Body fingerprinting — scan fn.toString() for stable string patterns
+        for (const key of exportKeys) {
+          const val = mod[key];
+          if (typeof val === 'function') {
+            const fn = val as (...args: unknown[]) => unknown;
+            let body = '';
+            try { body = fn.toString(); } catch { /* toString may fail on native code */ }
+
+            if (body && !body.startsWith('[')) {
+              // chatRequirements: references the sentinel API endpoint but NOT the header name
+              if (!chatRequirements && body.includes('chat-requirements') && !body.includes('requirements-token')) {
+                chatRequirements = fn as SentinelExports['chatRequirements'];
+                diag.push(`chatRequirements=${key}(body-match)`);
               }
-            } catch {
-              /* Turnstile may fail or hang, continue without */
-            }
-
-            let arkoseToken: unknown = null;
-            try {
-              if (sentinelModule.bl?.getEnforcementToken) {
-                arkoseToken = await Promise.race([
-                  sentinelModule.bl.getEnforcementToken(chatReqs),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Arkose timed out after 15s')), 15_000)),
-                ]);
+              // headerBuilder: references the sentinel header name
+              else if (!headerBuilder && (body.includes('requirements-token') || body.includes('openai-sentinel'))) {
+                headerBuilder = fn as SentinelExports['headerBuilder'];
+                diag.push(`headerBuilder=${key}(body-match)`);
               }
-            } catch {
-              /* Arkose may fail (captcha), continue without */
-            }
-
-            // Resolve proof-of-work token. bm may be:
-            // - An enforcer object with getEnforcementToken() (older API)
-            // - A PoW solver object with {answers, maxAttempts, requirementsSeed, sid}
-            //   which fX() uses directly to build the Proof-Token header
-            let proofToken: unknown = null;
-            try {
-              if (sentinelModule.bm) {
-                if (typeof sentinelModule.bm.getEnforcementToken === 'function') {
-                  proofToken = await Promise.race([
-                    sentinelModule.bm.getEnforcementToken(chatReqs),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Proof token timed out after 15s')), 15_000)),
-                  ]);
-                } else if (sentinelModule.bm.answers !== undefined) {
-                  proofToken = sentinelModule.bm;
-                }
+              // turnstileSolver: references turnstile (case-insensitive), arity ≤ 2
+              else if (!turnstileSolver && fn.length <= 2 && /turnstile/i.test(body)) {
+                turnstileSolver = fn as SentinelExports['turnstileSolver'];
+                diag.push(`turnstileSolver=${key}(body-match)`);
               }
-            } catch {
-              /* Proof token may fail, continue without */
             }
-
-            const extraHeaders = await Promise.race([
-              sentinelModule.fX(
-                chatReqs,
-                arkoseToken,
-                turnstileToken,
-                proofToken,
-                null,
-              ),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('fX header builder timed out after 15s')), 15_000)),
-            ]);
-            if (typeof extraHeaders === 'object' && extraHeaders !== null) {
-              sentinelHeaders = extraHeaders as Record<string, string>;
+          } else if (val && typeof val === 'object') {
+            const obj = val as Record<string, unknown>;
+            if (typeof obj.getEnforcementToken === 'function') {
+              if ((obj as Record<string, unknown>).answers === undefined && !arkoseEnforcer) {
+                arkoseEnforcer = obj as SentinelExports['arkoseEnforcer'];
+                diag.push(`arkoseEnforcer=${key}(hasGetEnforcementToken)`);
+              } else if (!powEnforcer) {
+                powEnforcer = obj;
+                diag.push(`powEnforcer=${key}(enforcer)`);
+              }
+            } else if (obj.answers !== undefined && !powEnforcer) {
+              powEnforcer = obj;
+              diag.push(`powEnforcer=${key}(hasPowAnswers)`);
             }
           }
         }
-      } catch (e) {
-        sentinelError = `Sentinel challenge failed: ${e instanceof Error ? e.message : String(e)}`;
-      }
 
-      // ── Step 5: Build conversation request body ──
+        // Phase 2: Arity fallback — if body fingerprinting missed chatRequirements or headerBuilder
+        if (!headerBuilder) {
+          for (const key of exportKeys) {
+            const val = mod[key];
+            if (typeof val === 'function' && (val as (...a: unknown[]) => unknown).length === 5) {
+              headerBuilder = val as SentinelExports['headerBuilder'];
+              diag.push(`headerBuilder=${key}(arity5)`);
+              break;
+            }
+          }
+        }
+        if (!chatRequirements) {
+          const arity0Fns: Array<{ name: string; fn: (...args: unknown[]) => unknown }> = [];
+          for (const key of exportKeys) {
+            const val = mod[key];
+            if (typeof val === 'function' && (val as (...a: unknown[]) => unknown).length === 0
+              && val !== headerBuilder && val !== turnstileSolver) {
+              arity0Fns.push({ name: key, fn: val as (...a: unknown[]) => unknown });
+            }
+          }
+          if (arity0Fns.length === 1) {
+            chatRequirements = arity0Fns[0]!.fn as SentinelExports['chatRequirements'];
+            diag.push(`chatRequirements=${arity0Fns[0]!.name}(arity0-unique)`);
+          } else if (arity0Fns.length > 1) {
+            const candidate = arity0Fns.find(f => f.name !== '__esModule' && f.name !== 'default');
+            if (candidate) {
+              chatRequirements = candidate.fn as SentinelExports['chatRequirements'];
+              diag.push(`chatRequirements=${candidate.name}(arity0-filtered)`);
+            }
+          }
+        }
+        if (!turnstileSolver) {
+          for (const key of exportKeys) {
+            const val = mod[key];
+            if (typeof val === 'function' && (val as (...a: unknown[]) => unknown).length === 1 && val !== chatRequirements && val !== headerBuilder) {
+              turnstileSolver = val as SentinelExports['turnstileSolver'];
+              diag.push(`turnstileSolver=${key}(arity1)`);
+              break;
+            }
+          }
+        }
+
+        if (!chatRequirements || !headerBuilder) {
+          diag.push(`missing: chatRequirements=${!!chatRequirements}, headerBuilder=${!!headerBuilder}`);
+          return null;
+        }
+
+        return { chatRequirements, turnstileSolver, arkoseEnforcer, powEnforcer, headerBuilder };
+      };
+
+      // ── Multi-strategy sentinel module URL discovery ──
+      // Try multiple strategies to find the oaistatic.com sentinel script URL.
+
+      const findSentinelAssetUrl = async (diag: string[]): Promise<string | null> => {
+        // Collect all oaistatic.com JS URLs from multiple sources, then validate
+        // each by importing and running discoverSentinelExports(). ChatGPT loads
+        // many scripts from oaistatic.com — only the sentinel module will have
+        // exports matching our fingerprints.
+
+        const collectCandidateUrls = (): string[] => {
+          const urls: string[] = [];
+          const seen = new Set<string>();
+          const add = (url: string) => { if (url && !seen.has(url)) { seen.add(url); urls.push(url); } };
+
+          // DOM <script> tags
+          for (const s of Array.from(document.scripts)) {
+            if (s.src?.includes('oaistatic.com') && s.src.endsWith('.js')) add(s.src);
+          }
+
+          // <link rel="modulepreload">
+          for (const l of Array.from(document.querySelectorAll('link[rel="modulepreload"]'))) {
+            const href = (l as HTMLLinkElement).href;
+            if (href?.includes('oaistatic.com') && href.endsWith('.js')) add(href);
+          }
+
+          // Performance API (catches dynamically import()-loaded scripts)
+          try {
+            const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+            for (const e of entries.filter(e => e.name.includes('oaistatic.com') && e.name.endsWith('.js')).sort((a, b) => b.startTime - a.startTime)) {
+              add(e.name);
+            }
+          } catch { /* Performance API may be restricted */ }
+
+          return urls;
+        };
+
+        // Try-import a candidate URL and check for sentinel exports
+        const tryCandidate = async (url: string): Promise<boolean> => {
+          try {
+            const mod = await import(/* @vite-ignore */ url) as Record<string, unknown>;
+            const testDiag: string[] = [];
+            const exports = discoverSentinelExports(mod, testDiag);
+            return exports !== null;
+          } catch {
+            return false;
+          }
+        };
+
+        // Quick scan — check candidates without waiting
+        let candidates = collectCandidateUrls();
+        if (candidates.length > 0) {
+          diag.push(`asset=candidates(${candidates.length})`);
+          for (const url of candidates) {
+            if (await tryCandidate(url)) {
+              diag.push(`asset=verified(${url.split('/').pop()})`);
+              return url;
+            }
+          }
+          diag.push('asset=candidates-no-sentinel');
+        }
+
+        // Poll DOM/performance for up to 5s (the SPA may still be hydrating)
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          const newCandidates = collectCandidateUrls();
+          // Only check newly discovered URLs
+          const fresh = newCandidates.filter(u => !candidates.includes(u));
+          if (fresh.length > 0) {
+            candidates = newCandidates;
+            for (const url of fresh) {
+              if (await tryCandidate(url)) {
+                diag.push(`asset=poll-verified(${url.split('/').pop()})`);
+                return url;
+              }
+            }
+          }
+        }
+
+        // Strategy 4: Fetch HTML page and extract oaistatic URLs from the response.
+        // Background tabs may never fully hydrate the Next.js SPA, so DOM-based
+        // discovery fails. The HTML response may contain asset URLs directly or
+        // reference a build manifest. ChatGPT may also serve the HTML with
+        // relative paths or different CDN subdomains — match broadly.
+        try {
+          diag.push('asset=trying-html-fetch');
+          const htmlRes = await fetch('https://chatgpt.com/', { credentials: 'include' });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            // Match any oaistatic.com JS URL (full or protocol-relative)
+            const urlMatches = html.match(/(?:https?:)?\/\/[a-z0-9.-]*oaistatic\.com\/[^"'\s<>]+\.js/g);
+            if (urlMatches && urlMatches.length > 0) {
+              const uniqueUrls = [...new Set(urlMatches.map(u => u.startsWith('//') ? `https:${u}` : u))];
+              diag.push(`asset=html-candidates(${uniqueUrls.length})`);
+              // Try each candidate — import and check for sentinel exports
+              for (const candidateUrl of uniqueUrls) {
+                try {
+                  const candidateModule = await import(/* @vite-ignore */ candidateUrl) as Record<string, unknown>;
+                  const testDiag: string[] = [];
+                  const exports = discoverSentinelExports(candidateModule, testDiag);
+                  if (exports) {
+                    diag.push(`asset=html-verified(${candidateUrl.split('/').pop()})`);
+                    return candidateUrl;
+                  }
+                } catch {
+                  // Not the sentinel module or import failed — continue
+                }
+              }
+              diag.push('asset=html-no-sentinel');
+            } else {
+              // Also try extracting from inline script that references asset paths
+              const assetPathMatch = html.match(/["']\/assets\/[a-zA-Z0-9_-]+\.js["']/g);
+              if (assetPathMatch && assetPathMatch.length > 0) {
+                const paths = [...new Set(assetPathMatch.map(m => m.replace(/["']/g, '')))];
+                diag.push(`asset=html-relative-paths(${paths.length})`);
+                for (const path of paths) {
+                  const fullUrl = `https://cdn.oaistatic.com${path}`;
+                  try {
+                    const candidateModule = await import(/* @vite-ignore */ fullUrl) as Record<string, unknown>;
+                    const testDiag: string[] = [];
+                    const exports = discoverSentinelExports(candidateModule, testDiag);
+                    if (exports) {
+                      diag.push(`asset=html-relative-verified(${path})`);
+                      return fullUrl;
+                    }
+                  } catch {
+                    // Not the sentinel module — continue
+                  }
+                }
+                diag.push('asset=html-relative-no-sentinel');
+              } else {
+                diag.push('asset=html-no-urls');
+              }
+            }
+          } else {
+            diag.push(`asset=html-fetch-${htmlRes.status}`);
+          }
+        } catch (e) {
+          diag.push(`asset=html-err(${e instanceof Error ? e.message : 'unknown'})`);
+        }
+
+        // Strategy 5: Last-resort known fallback URL.
+        // This URL may go stale when OpenAI deploys, but it's better than failing
+        // completely. The discoverSentinelExports() validation will catch if the
+        // module's export names have rotated.
+        const FALLBACK_SENTINEL_URL = 'https://cdn.oaistatic.com/assets/i5bamk05qmvsi6c3.js';
+        try {
+          const fallbackModule = await import(/* @vite-ignore */ FALLBACK_SENTINEL_URL) as Record<string, unknown>;
+          const testDiag: string[] = [];
+          const exports = discoverSentinelExports(fallbackModule, testDiag);
+          if (exports) {
+            diag.push(`asset=fallback-verified(${FALLBACK_SENTINEL_URL.split('/').pop()})`);
+            return FALLBACK_SENTINEL_URL;
+          }
+          diag.push('asset=fallback-no-sentinel-exports');
+        } catch {
+          diag.push('asset=fallback-import-failed');
+        }
+
+        diag.push('asset=not-found');
+        return null;
+      };
+
+      // ── Resolve sentinel headers (warmup + challenge solving) ──
+      // Extracted as inner function to enable retry on 403.
+
+      const resolveSentinelHeaders = async (
+        headers: Record<string, string>,
+        diag: string[],
+      ): Promise<{ sentinelHeaders: Record<string, string>; sentinelError: string }> => {
+        let sentinelHeaders: Record<string, string> = {};
+        let sentinelError = '';
+
+        // Warmup Sentinel endpoints (must complete BEFORE challenge solving).
+        // These prime server-side sentinel state; skipping them causes 403 "unusual activity".
+        const warmupUrls = [
+          'https://chatgpt.com/backend-api/conversation/init',
+          'https://chatgpt.com/backend-api/sentinel/chat-requirements/prepare',
+          'https://chatgpt.com/backend-api/sentinel/chat-requirements/finalize',
+        ];
+        for (const warmupUrl of warmupUrls) {
+          try {
+            const r = await fetch(warmupUrl, { method: 'POST', headers, body: '{}', credentials: 'include' });
+            diag.push(`warmup:${warmupUrl.split('/').pop()}=${r.status}`);
+          } catch (e) {
+            diag.push(`warmup:${warmupUrl.split('/').pop()}=err(${e instanceof Error ? e.message : 'unknown'})`);
+          }
+        }
+
+        // Sentinel antibot challenge solving
+        try {
+          const assetUrl = await findSentinelAssetUrl(diag);
+          if (!assetUrl) {
+            sentinelError = 'Sentinel oaistatic script not found on page. The ChatGPT page may not have fully loaded.';
+            return { sentinelHeaders, sentinelError };
+          }
+
+          const sentinelModule = await import(/* @vite-ignore */ assetUrl) as Record<string, unknown>;
+
+          // Discover function roles by structural fingerprinting
+          const exports = discoverSentinelExports(sentinelModule, diag);
+          if (!exports) {
+            const exportNames = Object.keys(sentinelModule).join(', ');
+            sentinelError = `Sentinel function discovery failed — could not identify chatRequirements/headerBuilder from exports: [${exportNames}]. Function names may have been rotated.`;
+            return { sentinelHeaders, sentinelError };
+          }
+
+          // Call chatRequirements to get challenge parameters
+          const chatReqs = await Promise.race([
+            exports.chatRequirements(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('chat-requirements timed out after 15s')), 15_000)),
+          ]);
+
+          // Validate the response looks like real chat-requirements
+          const turnstile = chatReqs?.turnstile as Record<string, unknown> | undefined;
+          const turnstileKey = turnstile?.bx ?? turnstile?.dx;
+
+          if (!turnstileKey) {
+            sentinelError = 'Sentinel chat-requirements response missing turnstile key (bx/dx)';
+            return { sentinelHeaders, sentinelError };
+          }
+
+          // Solve Turnstile challenge
+          let turnstileToken: unknown = null;
+          try {
+            if (exports.turnstileSolver) {
+              turnstileToken = await Promise.race([
+                exports.turnstileSolver(turnstileKey),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Turnstile solver timed out after 15s')), 15_000)),
+              ]);
+            }
+          } catch { /* Turnstile may fail or hang, continue without */ }
+
+          // Solve Arkose challenge
+          let arkoseToken: unknown = null;
+          try {
+            if (exports.arkoseEnforcer?.getEnforcementToken) {
+              arkoseToken = await Promise.race([
+                exports.arkoseEnforcer.getEnforcementToken(chatReqs),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Arkose timed out after 15s')), 15_000)),
+              ]);
+            }
+          } catch { /* Arkose may fail (captcha), continue without */ }
+
+          // Resolve proof-of-work token. powEnforcer may be:
+          // - An enforcer object with getEnforcementToken() (older API)
+          // - A PoW solver object with {answers, maxAttempts, requirementsSeed, sid}
+          //   which headerBuilder uses directly to build the Proof-Token header
+          let proofToken: unknown = null;
+          try {
+            if (exports.powEnforcer && typeof exports.powEnforcer === 'object') {
+              const pow = exports.powEnforcer as Record<string, unknown>;
+              if (typeof pow.getEnforcementToken === 'function') {
+                proofToken = await Promise.race([
+                  (pow.getEnforcementToken as (r: unknown) => Promise<unknown>)(chatReqs),
+                  new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Proof token timed out after 15s')), 15_000)),
+                ]);
+              } else if (pow.answers !== undefined) {
+                proofToken = exports.powEnforcer;
+              }
+            }
+          } catch { /* Proof token may fail, continue without */ }
+
+          // Build sentinel headers
+          const extraHeaders = await Promise.race([
+            exports.headerBuilder(chatReqs, arkoseToken, turnstileToken, proofToken, null),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('headerBuilder timed out after 15s')), 15_000)),
+          ]);
+          if (typeof extraHeaders === 'object' && extraHeaders !== null) {
+            sentinelHeaders = extraHeaders as Record<string, string>;
+          }
+        } catch (e) {
+          sentinelError = `Sentinel challenge failed: ${e instanceof Error ? e.message : String(e)}`;
+        }
+
+        // Check for Signal Orchestrator (behavioral biometrics) — informational only
+        try {
+          const soKeys = Object.keys(window).filter(k => k.startsWith('__oai_so_'));
+          diag.push(`signal-orchestrator=${soKeys.length > 0 ? `${soKeys.length}-props` : 'absent'}`);
+        } catch { /* ignore */ }
+
+        return { sentinelHeaders, sentinelError };
+      };
+
+      // ── Step 3: Resolve sentinel headers ──
+      const diag: string[] = [];
+      let { sentinelHeaders, sentinelError } = await resolveSentinelHeaders(cgHeaders, diag);
+
+      // ── Step 4: Build conversation request body ──
       const messageId = crypto.randomUUID();
       const parentMessageId = existingParentMsgId || crypto.randomUUID();
 
@@ -1659,19 +1974,24 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         conversationBody.conversation_id = existingConversationId;
       }
 
-      // ── Step 6: Send conversation request (with sentinel headers if available) ──
-      const finalHeaders = Object.keys(sentinelHeaders).length > 0
-        ? { ...cgHeaders, ...sentinelHeaders }
-        : cgHeaders;
+      // ── Step 5: Send conversation request (with sentinel headers if available) ──
+      // On 403, retry once with freshly resolved sentinel tokens + refreshed access token.
 
-      let cgResponse: Response;
-      try {
-        cgResponse = await fetch('https://chatgpt.com/backend-api/conversation', {
+      const sendConversation = async (headers: Record<string, string>): Promise<Response> => {
+        const finalHeaders = Object.keys(sentinelHeaders).length > 0
+          ? { ...headers, ...sentinelHeaders }
+          : headers;
+        return fetch('https://chatgpt.com/backend-api/conversation', {
           method: 'POST',
           headers: finalHeaders,
           credentials: 'include',
           body: JSON.stringify(conversationBody),
         });
+      };
+
+      let cgResponse: Response;
+      try {
+        cgResponse = await sendConversation(cgHeaders);
       } catch {
         // Network error — retry without sentinel headers
         cgResponse = await fetch('https://chatgpt.com/backend-api/conversation', {
@@ -1682,6 +2002,41 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         });
       }
 
+      // ── 403 Retry: refresh access token + re-solve sentinel challenges ──
+      if (cgResponse.status === 403) {
+        diag.push('retry=403');
+
+        // Refresh access token
+        try {
+          const retrySession = await fetch('https://chatgpt.com/api/auth/session', { credentials: 'include' });
+          if (retrySession.ok) {
+            const retryData = (await retrySession.json()) as Record<string, unknown>;
+            const newToken = (retryData.accessToken ?? '') as string;
+            if (newToken) {
+              accessToken = newToken;
+              diag.push('retry-token=refreshed');
+            }
+          }
+        } catch { /* use existing token */ }
+
+        const retryHeaders = baseHeaders(accessToken, deviceId);
+        const retryDiag: string[] = [];
+        const retryResult = await resolveSentinelHeaders(retryHeaders, retryDiag);
+        diag.push(...retryDiag.map(d => `retry:${d}`));
+
+        sentinelHeaders = retryResult.sentinelHeaders;
+        sentinelError = retryResult.sentinelError;
+
+        try {
+          cgResponse = await sendConversation(retryHeaders);
+        } catch {
+          cgResponse = await fetch('https://chatgpt.com/backend-api/conversation', {
+            method: 'POST', headers: retryHeaders, credentials: 'include',
+            body: JSON.stringify(conversationBody),
+          });
+        }
+      }
+
       if (!cgResponse.ok) {
         let errorBody = '';
         try {
@@ -1690,20 +2045,21 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
         } catch {
           /* ignore */
         }
+        const diagStr = diag.length > 0 ? ` [diag: ${diag.join('; ')}]` : '';
         const sentinelHint = sentinelError
-          ? ` Sentinel: ${sentinelError}`
+          ? ` Sentinel: ${sentinelError}${diagStr}`
           : Object.keys(sentinelHeaders).length === 0
-            ? ' Sentinel headers were not available \u2014 the oaistatic script may not have loaded on this page.'
-            : '';
+            ? ` Sentinel headers were not available — the oaistatic script may not have loaded on this page.${diagStr}`
+            : diagStr;
         const authHint =
           cgResponse.status === 401 || cgResponse.status === 403
-            ? ` Please visit https://chatgpt.com to verify your account is active, then log out and log back in via Settings \u2192 Models.${sentinelHint}`
-            : '';
+            ? ` Please visit https://chatgpt.com to verify your account is active, then log out and log back in via Settings → Models.${sentinelHint}`
+            : sentinelHint;
         window.postMessage(
           {
             type: 'WEB_LLM_ERROR',
             requestId,
-            error: `HTTP ${cgResponse.status}: ${cgResponse.statusText}${errorBody ? ` \u2014 ${errorBody}` : ''}${authHint}`,
+            error: `HTTP ${cgResponse.status}: ${cgResponse.statusText}${errorBody ? ` — ${errorBody}` : ''}${authHint}`,
           },
           origin,
         );
