@@ -100,13 +100,26 @@ interface SessionUsage {
 type ThinkingLevel = 'fast' | 'thinking';
 
 /** Provider identifiers */
-type ModelProvider = 'openai' | 'anthropic' | 'google' | 'openrouter' | 'custom' | 'azure' | 'openai-codex' | 'local' | 'web';
+type ModelProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'openrouter'
+  | 'custom'
+  | 'azure'
+  | 'openai-codex'
+  | 'local'
+  | 'web';
 
 /** Routing mode for model requests */
 type RoutingMode = 'direct';
 
 /** API protocol for OpenAI-compatible providers */
-type ModelApi = 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'azure-openai-responses';
+type ModelApi =
+  | 'openai-completions'
+  | 'openai-responses'
+  | 'openai-codex-responses'
+  | 'azure-openai-responses';
 
 /** Model configuration */
 interface ChatModel {
@@ -134,16 +147,109 @@ interface ChatModel {
 
 /** Web provider options for UI dropdowns and auth — single source of truth. */
 const WEB_PROVIDER_OPTIONS = [
-  { value: 'gemini-web', label: 'Gemini (gemini.google.com)', loginUrl: 'https://gemini.google.com', cookieDomain: '.google.com', sessionIndicators: ['__Secure-1PSID', 'SID'], defaultModelId: 'gemini-3-flash', defaultModelName: 'Gemini 3 Flash', supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[] },
-  { value: 'chatgpt-web', label: 'ChatGPT (chatgpt.com)', loginUrl: 'https://chatgpt.com', cookieDomain: '.chatgpt.com', sessionIndicators: ['__Secure-next-auth.session-token', '__Secure-next-auth.session-token.0'], defaultModelId: 'auto', defaultModelName: 'GPT-5.3', supportedThinkingLevels: [] as ThinkingLevel[] },
-  { value: 'claude-web', label: 'Claude (claude.ai)', loginUrl: 'https://claude.ai', cookieDomain: '.claude.ai', sessionIndicators: ['sessionKey'], defaultModelId: 'claude-sonnet-4.6', defaultModelName: 'Claude Sonnet 4.6', supportedThinkingLevels: ['thinking'] as ThinkingLevel[] },
-  { value: 'deepseek-web', label: 'DeepSeek (chat.deepseek.com)', loginUrl: 'https://chat.deepseek.com', cookieDomain: '.deepseek.com', sessionIndicators: ['ds_session_id', 'HWSID'], defaultModelId: 'deepseek-chat', defaultModelName: 'DeepSeek V3', supportedThinkingLevels: ['thinking'] as ThinkingLevel[] },
-  { value: 'doubao-web', label: 'Doubao (doubao.com)', loginUrl: 'https://www.doubao.com/chat/', cookieDomain: '.doubao.com', sessionIndicators: ['sessionid'], defaultModelId: 'doubao-seed-2.0', defaultModelName: 'Doubao Seed 2.0', supportedThinkingLevels: [] as ThinkingLevel[] },
-  { value: 'kimi-web', label: 'Kimi (kimi.com)', loginUrl: 'https://www.kimi.com', cookieDomain: '.kimi.com', sessionIndicators: ['access_token'], checkLocalStorage: true, defaultModelId: 'kimi', defaultModelName: 'Kimi', supportedThinkingLevels: ['thinking'] as ThinkingLevel[] },
-  { value: 'qwen-web', label: 'Qwen (chat.qwen.ai)', loginUrl: 'https://chat.qwen.ai', cookieDomain: '.qwen.ai', sessionIndicators: ['token', 'ctoken', 'login_aliyunid_ticket'], defaultModelId: 'qwen3.5-plus', defaultModelName: 'Qwen 3.5 Plus', supportedThinkingLevels: ['thinking'] as ThinkingLevel[] },
-  { value: 'qwen-cn-web', label: 'Qwen CN (qianwen.com)', loginUrl: 'https://qianwen.com', cookieDomain: '.qianwen.com', sessionIndicators: ['tongyi_sso_ticket'], defaultModelId: 'qwen-max', defaultModelName: 'Qwen Max (CN)', supportedThinkingLevels: ['thinking'] as ThinkingLevel[] },
-  { value: 'glm-web', label: 'GLM (chatglm.cn)', loginUrl: 'https://chatglm.cn', cookieDomain: '.chatglm.cn', sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'], defaultModelId: 'glm-5', defaultModelName: 'GLM-5', refreshUrl: 'https://chatglm.cn/chatglm/user-api/user/refresh', supportedThinkingLevels: [] as ThinkingLevel[] },
-  { value: 'glm-intl-web', label: 'GLM Intl (chat.z.ai)', loginUrl: 'https://chat.z.ai', cookieDomain: '.z.ai', sessionIndicators: ['token'], checkLocalStorage: true, defaultModelId: 'GLM-5-Turbo', defaultModelName: 'GLM-5-Turbo', supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[] },
+  {
+    value: 'gemini-web',
+    label: 'Gemini (gemini.google.com)',
+    loginUrl: 'https://gemini.google.com',
+    cookieDomain: '.google.com',
+    sessionIndicators: ['__Secure-1PSID', 'SID'],
+    defaultModelId: 'gemini-3-flash',
+    defaultModelName: 'Gemini 3 Flash',
+    supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'chatgpt-web',
+    label: 'ChatGPT (chatgpt.com)',
+    loginUrl: 'https://chatgpt.com',
+    cookieDomain: '.chatgpt.com',
+    sessionIndicators: ['__Secure-next-auth.session-token', '__Secure-next-auth.session-token.0'],
+    defaultModelId: 'auto',
+    defaultModelName: 'GPT-5.3',
+    supportedThinkingLevels: [] as ThinkingLevel[],
+  },
+  {
+    value: 'claude-web',
+    label: 'Claude (claude.ai)',
+    loginUrl: 'https://claude.ai',
+    cookieDomain: '.claude.ai',
+    sessionIndicators: ['sessionKey'],
+    defaultModelId: 'claude-sonnet-4.6',
+    defaultModelName: 'Claude Sonnet 4.6',
+    supportedThinkingLevels: ['thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'deepseek-web',
+    label: 'DeepSeek (chat.deepseek.com)',
+    loginUrl: 'https://chat.deepseek.com',
+    cookieDomain: '.deepseek.com',
+    sessionIndicators: ['ds_session_id', 'HWSID'],
+    defaultModelId: 'deepseek-chat',
+    defaultModelName: 'DeepSeek V3',
+    supportedThinkingLevels: ['thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'doubao-web',
+    label: 'Doubao (doubao.com)',
+    loginUrl: 'https://www.doubao.com/chat/',
+    cookieDomain: '.doubao.com',
+    sessionIndicators: ['sessionid'],
+    defaultModelId: 'doubao-seed-2.0',
+    defaultModelName: 'Doubao Seed 2.0',
+    supportedThinkingLevels: [] as ThinkingLevel[],
+  },
+  {
+    value: 'kimi-web',
+    label: 'Kimi (kimi.com)',
+    loginUrl: 'https://www.kimi.com',
+    cookieDomain: '.kimi.com',
+    sessionIndicators: ['access_token'],
+    checkLocalStorage: true,
+    defaultModelId: 'kimi',
+    defaultModelName: 'Kimi',
+    supportedThinkingLevels: ['thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'qwen-web',
+    label: 'Qwen (chat.qwen.ai)',
+    loginUrl: 'https://chat.qwen.ai',
+    cookieDomain: '.qwen.ai',
+    sessionIndicators: ['token', 'ctoken', 'login_aliyunid_ticket'],
+    defaultModelId: 'qwen3.5-plus',
+    defaultModelName: 'Qwen 3.5 Plus',
+    supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'qwen-cn-web',
+    label: 'Qwen CN (qianwen.com)',
+    loginUrl: 'https://qianwen.com',
+    cookieDomain: '.qianwen.com',
+    sessionIndicators: ['tongyi_sso_ticket'],
+    defaultModelId: 'qwen-max',
+    defaultModelName: 'Qwen Max (CN)',
+    supportedThinkingLevels: ['thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'glm-web',
+    label: 'GLM (chatglm.cn)',
+    loginUrl: 'https://chatglm.cn',
+    cookieDomain: '.chatglm.cn',
+    sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
+    defaultModelId: 'GLM-5-Turbo',
+    defaultModelName: 'GLM-5-Turbo',
+    refreshUrl: 'https://chatglm.cn/chatglm/user-api/user/refresh',
+    supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[],
+  },
+  {
+    value: 'glm-intl-web',
+    label: 'GLM Intl (chat.z.ai)',
+    loginUrl: 'https://chat.z.ai',
+    cookieDomain: '.z.ai',
+    sessionIndicators: ['token'],
+    checkLocalStorage: true,
+    defaultModelId: 'GLM-5-Turbo',
+    defaultModelName: 'GLM-5-Turbo',
+    supportedThinkingLevels: ['fast', 'thinking'] as ThinkingLevel[],
+  },
 ] as const;
 
 /** Tool definition (metadata only — no execute function) */

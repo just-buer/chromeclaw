@@ -15,6 +15,7 @@ const makePayload = (opts: {
   function_call?: { name: string; arguments: string };
   function_id?: string;
   role?: string;
+  extra?: Record<string, { content?: string[] }>;
 }) => ({
   choices: [
     {
@@ -24,6 +25,7 @@ const makePayload = (opts: {
         ...(opts.function_call ? { function_call: opts.function_call } : {}),
         ...(opts.function_id ? { function_id: opts.function_id } : {}),
         ...(opts.role ? { role: opts.role } : {}),
+        ...(opts.extra ? { extra: opts.extra } : {}),
       },
     },
   ],
@@ -1135,15 +1137,13 @@ describe('createQwenStreamAdapter', () => {
       // All three should produce tool_calls, none should leak error text
       expect(results).toEqual([
         {
-          feedText:
-            '<tool_call id="aaaaaaaa" name="browser">{"action":"open"}</tool_call>',
+          feedText: '<tool_call id="aaaaaaaa" name="browser">{"action":"open"}</tool_call>',
         },
         {
           feedText: '<tool_call id="aaaaaaaa" name="web_search">{"q":"test"}</tool_call>',
         },
         {
-          feedText:
-            '<tool_call id="aaaaaaaa" name="web_fetch">{"url":"http://x"}</tool_call>',
+          feedText: '<tool_call id="aaaaaaaa" name="web_fetch">{"url":"http://x"}</tool_call>',
         },
       ]);
     });
@@ -1358,9 +1358,7 @@ describe('createQwenStreamAdapter', () => {
       });
 
       // 2. All 6 read tool_calls produced in order
-      const readResults = results.filter(
-        r => r !== null && r.feedText.includes('name="read"'),
-      );
+      const readResults = results.filter(r => r !== null && r.feedText.includes('name="read"'));
       expect(readResults).toHaveLength(6);
       for (let i = 0; i < files.length; i++) {
         expect(readResults[i]).toEqual({
@@ -1885,6 +1883,351 @@ describe('createQwenStreamAdapter', () => {
       });
       // Nothing left to flush
       expect(adapter.flushPendingCalls!()).toBeNull();
+    });
+  });
+
+  describe('thinking_summary phase (Qwen-specific)', () => {
+    it('injects <think> when entering thinking_summary phase with extra content', () => {
+      const result = adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_title: { content: ['Calculating the sum'] },
+            summary_thought: { content: ['I recognize this as basic addition.'] },
+          },
+        }),
+        delta: '',
+      });
+      expect(result).toEqual({ feedText: '<think>I recognize this as basic addition.' });
+    });
+
+    it('does not re-inject <think> when staying in thinking_summary phase', () => {
+      // Enter thinking_summary
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: ['First thought.'] },
+          },
+        }),
+        delta: '',
+      });
+      // Same phase, updated content
+      const result = adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: ['Updated thought with more detail.'] },
+          },
+        }),
+        delta: '',
+      });
+      expect(result).toEqual({ feedText: 'Updated thought with more detail.' });
+    });
+
+    it('injects </think> when transitioning from thinking_summary to answer', () => {
+      // Enter thinking_summary
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: ['Thinking...'] },
+          },
+        }),
+        delta: '',
+      });
+      // Transition to answer
+      const result = adapter.processEvent({
+        parsed: makePayload({ phase: 'answer', content: 'The answer is 2' }),
+        delta: 'The answer is 2',
+      });
+      expect(result).toEqual({ feedText: '</think>The answer is 2' });
+    });
+
+    it('handles thinking_summary → answer with finished status in between', () => {
+      const results: Array<{ feedText: string } | null> = [];
+
+      // thinking_summary with content
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({
+            phase: 'thinking_summary',
+            content: '',
+            extra: {
+              summary_thought: { content: ['Reasoning about the problem.'] },
+            },
+          }),
+          delta: '',
+        }),
+      );
+
+      // thinking_summary finished (empty, no extra)
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'thinking_summary', content: '' }),
+          delta: '',
+        }),
+      );
+
+      // answer phase
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'answer', content: '1 + 1 = 2' }),
+          delta: '1 + 1 = 2',
+        }),
+      );
+
+      expect(results).toEqual([
+        { feedText: '<think>Reasoning about the problem.' },
+        null, // empty delta in same phase, no extra content
+        { feedText: '</think>1 + 1 = 2' },
+      ]);
+    });
+
+    it('flush() closes open thinking_summary block', () => {
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: ['Still thinking...'] },
+          },
+        }),
+        delta: '',
+      });
+      expect(adapter.flush()).toEqual({ feedText: '</think>' });
+    });
+
+    it('joins multiple thought lines with newline', () => {
+      const result = adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: {
+              content: [
+                'First line of reasoning.',
+                'Second line of reasoning.',
+                'Third line of reasoning.',
+              ],
+            },
+          },
+        }),
+        delta: '',
+      });
+      expect(result).toEqual({
+        feedText:
+          '<think>First line of reasoning.\nSecond line of reasoning.\nThird line of reasoning.',
+      });
+    });
+
+    it('emits <think> when entering thinking_summary with empty extra content', () => {
+      const result = adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: [] },
+          },
+        }),
+        delta: '',
+      });
+      // No extra content and delta is falsy → falls to phase-change check
+      // thinking_summary is a new phase, phasePrefix(undefined, 'thinking_summary') returns '<think>'
+      expect(result).toEqual({ feedText: '<think>' });
+    });
+
+    it('emits </think><think> for think → thinking_summary with empty extra', () => {
+      // Enter think phase first (DeepSeek-style)
+      adapter.processEvent({
+        parsed: makePayload({ phase: 'think', content: 'reasoning...' }),
+        delta: 'reasoning...',
+      });
+      // Transition to thinking_summary with empty extra
+      const result = adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: [] },
+          },
+        }),
+        delta: '',
+      });
+      // Should close the old think and open the new one
+      expect(result).toEqual({ feedText: '</think><think>' });
+    });
+
+    it('produces well-formed tags for think → thinking_summary (empty extra) → answer', () => {
+      const results: Array<{ feedText: string } | null> = [];
+
+      // Enter think phase
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'think', content: 'reasoning...' }),
+          delta: 'reasoning...',
+        }),
+      );
+
+      // Transition to thinking_summary with empty extra
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({
+            phase: 'thinking_summary',
+            content: '',
+            extra: { summary_thought: { content: [] } },
+          }),
+          delta: '',
+        }),
+      );
+
+      // Transition to answer
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'answer', content: 'The answer' }),
+          delta: 'The answer',
+        }),
+      );
+
+      expect(results).toEqual([
+        { feedText: '<think>reasoning...' },
+        { feedText: '</think><think>' },
+        { feedText: '</think>The answer' },
+      ]);
+    });
+
+    it('emits <think> when re-entering thinking_summary from answer via empty delta', () => {
+      // Simulate Qwen search flow: thinking_summary → web_search → answer → thinking_summary
+      // Enter thinking_summary
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: { summary_thought: { content: ['Planning search...'] } },
+        }),
+        delta: '',
+      });
+      // Transition to answer (simulating post-web_search)
+      adapter.processEvent({
+        parsed: makePayload({ phase: 'answer', content: 'partial' }),
+        delta: 'partial',
+      });
+      // Re-enter thinking_summary with empty delta (no extra)
+      const result = adapter.processEvent({
+        parsed: makePayload({ phase: 'thinking_summary', content: '' }),
+        delta: '',
+      });
+      expect(result).toEqual({ feedText: '<think>' });
+    });
+
+    it('closes thinking_summary before function_call response', () => {
+      // Enter thinking_summary
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'thinking_summary',
+          content: '',
+          extra: {
+            summary_thought: { content: ['Let me search for this.'] },
+          },
+        }),
+        delta: '',
+      });
+
+      // function_call arrives
+      adapter.processEvent({
+        parsed: makePayload({
+          phase: 'web_search',
+          function_call: { name: 'web_search', arguments: '{"q":"test"}' },
+          function_id: 'call_aaa',
+        }),
+        delta: null,
+      });
+
+      // Function response
+      const result = adapter.processEvent({
+        parsed: makePayload({ role: 'function', function_id: 'call_aaa' }),
+        delta: null,
+      });
+      expect(result).toEqual({
+        feedText: '<tool_call id="aaaaaaaa" name="web_search">{"q":"test"}</tool_call>',
+      });
+    });
+
+    it('handles full Qwen thinking_summary → answer flow from real traffic', () => {
+      const results: Array<{ feedText: string } | null> = [];
+
+      // response.created event (no choices) — adapter gets undefined delta
+      results.push(
+        adapter.processEvent({
+          parsed: {
+            'response.created': {
+              chat_id: 'abc',
+              parent_id: 'def',
+              response_id: 'ghi',
+            },
+          },
+          delta: null,
+        }),
+      );
+
+      // thinking_summary with extra content
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({
+            phase: 'thinking_summary',
+            content: '',
+            extra: {
+              summary_title: { content: ['Calculating the sum of one and one'] },
+              summary_thought: {
+                content: [
+                  'I recognize this as a foundational arithmetic operation.',
+                  'The result is immediately known to me as two.',
+                ],
+              },
+            },
+          }),
+          delta: '',
+        }),
+      );
+
+      // thinking_summary finished
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'thinking_summary', content: '' }),
+          delta: '',
+        }),
+      );
+
+      // answer phase starts
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'answer', content: '1 + 1 = **2**' }),
+          delta: '1 + 1 = **2**',
+        }),
+      );
+
+      // answer continues
+      results.push(
+        adapter.processEvent({
+          parsed: makePayload({ phase: 'answer', content: ' done!' }),
+          delta: ' done!',
+        }),
+      );
+
+      expect(results).toEqual([
+        null, // response.created — no choices, no delta
+        {
+          feedText:
+            '<think>I recognize this as a foundational arithmetic operation.\nThe result is immediately known to me as two.',
+        },
+        null, // thinking_summary finished — same phase, no extra, empty delta
+        { feedText: '</think>1 + 1 = **2**' },
+        { feedText: ' done!' },
+      ]);
     });
   });
 });

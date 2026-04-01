@@ -17,7 +17,13 @@ import { toast } from 'sonner';
 import { Check } from 'lucide-react';
 import { Select as SelectPrimitive } from 'radix-ui';
 import { getSlashCommands } from '@extension/shared';
-import type { Attachment, ChatModel, SlashCommandDef, ThinkingLevel, StreamingStatus } from '@extension/shared';
+import type {
+  Attachment,
+  ChatModel,
+  SlashCommandDef,
+  ThinkingLevel,
+  StreamingStatus,
+} from '@extension/shared';
 import type { ChangeEvent, ClipboardEvent, FormEvent, KeyboardEvent } from 'react';
 
 const THINKING_LEVEL_I18N = {
@@ -307,7 +313,10 @@ const ChatInput = ({
         />
         <div className="flex items-center justify-between p-1">
           <div className="flex items-center gap-1">
-            <AttachmentsButton disabled={isStreaming} onClick={() => fileInputRef.current?.click()} />
+            <AttachmentsButton
+              disabled={isStreaming}
+              onClick={() => fileInputRef.current?.click()}
+            />
             {models.length > 0 && (
               <Select onValueChange={onModelChange} value={selectedModelId}>
                 <SelectTrigger
@@ -329,7 +338,9 @@ const ChatInput = ({
           </div>
           <div className="flex items-center gap-1">
             {showThinkingLevel && (
-              <Select onValueChange={v => onThinkingLevelChange?.(v as ThinkingLevel)} value={thinkingLevel ?? 'fast'}>
+              <Select
+                onValueChange={v => onThinkingLevelChange?.(v as ThinkingLevel)}
+                value={thinkingLevel ?? 'fast'}>
                 <SelectTrigger
                   className={cn(
                     'text-muted-foreground h-auto border-none bg-transparent px-2 py-1.5 font-medium shadow-none transition-colors',
@@ -344,11 +355,17 @@ const ChatInput = ({
                       value={level}
                       className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none">
                       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                        <SelectPrimitive.ItemIndicator><Check className="h-4 w-4" /></SelectPrimitive.ItemIndicator>
+                        <SelectPrimitive.ItemIndicator>
+                          <Check className="h-4 w-4" />
+                        </SelectPrimitive.ItemIndicator>
                       </span>
                       <div className="flex flex-col">
-                        <SelectPrimitive.ItemText>{t(THINKING_LEVEL_I18N[level].label)}</SelectPrimitive.ItemText>
-                        <span className="text-muted-foreground text-xs">{t(THINKING_LEVEL_I18N[level].desc)}</span>
+                        <SelectPrimitive.ItemText>
+                          {t(THINKING_LEVEL_I18N[level].label)}
+                        </SelectPrimitive.ItemText>
+                        <span className="text-muted-foreground text-xs">
+                          {t(THINKING_LEVEL_I18N[level].desc)}
+                        </span>
                       </div>
                     </SelectPrimitive.Item>
                   ))}
@@ -356,7 +373,7 @@ const ChatInput = ({
               </Select>
             )}
             <Button
-              className="gap-1.5 rounded-lg"
+              className="shrink-0 gap-1.5 rounded-lg"
               disabled={isUploading || (!isStreaming && !input.trim() && attachments.length === 0)}
               size="icon"
               type="submit"
