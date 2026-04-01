@@ -35,6 +35,7 @@ import {
   MailIcon,
   MessagesSquareIcon,
   MonitorIcon,
+  PlugIcon,
   SearchIcon,
   TelescopeIcon,
   UsersIcon,
@@ -494,6 +495,15 @@ const ToolConfig = () => {
     });
   }, []);
 
+  const handlePageBridgeToggle = useCallback((enabled: boolean) => {
+    setConfig(prev => {
+      if (!prev) return null;
+      const next: ToolConfigData = { ...prev, pageBridgeEnabled: enabled };
+      toolConfigStorage.set(next);
+      return next;
+    });
+  }, []);
+
   if (!config) return null;
 
   /** Check if a sub-config group's tools are enabled */
@@ -675,6 +685,52 @@ const ToolConfig = () => {
                     </div>
                   );
                 })}
+            </div>
+          </div>
+
+          {/* ── Page Bridge (Web MCP) ── */}
+          <div>
+            <Separator className="mb-4" />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <PlugIcon className="text-muted-foreground size-5" />
+                  <div>
+                    <span className="text-sm font-medium">Page Bridge</span>
+                    <p className="text-muted-foreground text-xs">
+                      自动发现网页通过 <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">window.__ulcopilot</code> 注册的工具
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <input
+                    checked={config.pageBridgeEnabled ?? false}
+                    className="accent-primary size-4"
+                    id="page-bridge-toggle"
+                    onChange={e => handlePageBridgeToggle(e.target.checked)}
+                    type="checkbox"
+                  />
+                  <span className="text-muted-foreground text-xs">启用</span>
+                </div>
+              </div>
+              {config.pageBridgeEnabled && (
+                <div className="bg-muted rounded-md p-3 font-mono text-[11px] leading-relaxed">
+                  <p className="text-muted-foreground mb-1 font-sans text-xs">在目标页面注入以下脚本注册工具：</p>
+                  <p>{'window.__ulcopilot = { tools: {} };'}</p>
+                  <p>{'window.__ulcopilot.registerTool = (name, cfg) => {'}</p>
+                  <p className="pl-4">{'window.__ulcopilot.tools[name] = cfg;'}</p>
+                  <p>{'};'}</p>
+                  <p className="text-blue-500 mt-2">{'// 示例：注册 fill_form'}</p>
+                  <p>{"window.__ulcopilot.registerTool('fill_form', {"}</p>
+                  <p className="pl-4">{"description: '填充表单字段',"}</p>
+                  <p className="pl-4">{"requiresApproval: false,"}</p>
+                  <p className="pl-4 text-blue-500">{'// ^ 可选，默认 true（需审批）'}</p>
+                  <p className="pl-4">{'params: [{ name: \'formData\', type: \'object\','}</p>
+                  <p className="pl-8">{"description: '键值对' }],"}</p>
+                  <p className="pl-4">{'handler: async (args) => { /* ... */ }'}</p>
+                  <p>{'});'}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

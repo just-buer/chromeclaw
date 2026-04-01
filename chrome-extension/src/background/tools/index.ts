@@ -6,6 +6,7 @@
 import { agentsListToolDef } from './agents-list';
 import { browserToolDef } from './browser';
 import { debuggerToolDef } from './debugger';
+import { discoverPageTools, executePageTool } from './page-bridge';
 import { getRemoteMcpAgentTools } from './remote-mcp';
 import { deepResearchToolDef } from './deep-research';
 import { createDocumentToolDef } from './documents';
@@ -195,6 +196,47 @@ const getAgentTools = async (opts?: {
     });
   }
 
+  // Discover page-registered tools via window.__ulcopilot (Page Bridge)
+  if (config.pageBridgeEnabled && !opts?.headless) {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.id && activeTab.url && !activeTab.url.startsWith('chrome')) {
+        const sourceTabId = activeTab.id;
+        const pageDefs = await discoverPageTools(sourceTabId);
+        const existingNames = new Set(tools.map(t => t.name));
+
+        for (const pd of pageDefs) {
+          if (existingNames.has(pd.name)) continue;
+          tools.push({
+            name: pd.name,
+            label: `[Page] ${pd.name}`,
+            description: `[Page Tool] ${pd.description}`,
+            parameters: buildCustomToolSchema(pd.params),
+            requiresApproval:
+              config.requireApprovalTools?.[pd.name] ??
+              pd.requiresApproval ??
+              true,
+            execute: async (_toolCallId, params) => {
+              const result = await executePageTool(sourceTabId, pd.name, params);
+              return defaultFormatResult(result);
+            },
+          });
+        }
+
+        if (pageDefs.length > 0) {
+          toolLog.info('Page bridge: discovered tools', {
+            tabId: sourceTabId,
+            tools: pageDefs.map(p => p.name),
+          });
+        }
+      }
+    } catch (err) {
+      toolLog.warn('Page bridge discovery failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return tools;
 };
 
@@ -257,6 +299,27 @@ const executeTool = async (
         );
         toolLog.debug('Complete (custom)', { toolName });
         return result;
+      }
+    }
+
+    // Fallback: try page bridge tool on the active tab
+    const toolConfig = await toolConfigStorage.get();
+    if (toolConfig.pageBridgeEnabled) {
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab?.id) {
+          const result = await withTimeout(
+            executePageTool(activeTab.id, toolName, args ?? {}),
+            TOOL_TIMEOUT_MS,
+            toolName,
+          );
+          if (!String(result).includes('is no longer registered')) {
+            toolLog.debug('Complete (page bridge)', { toolName });
+            return result;
+          }
+        }
+      } catch {
+        // Fall through to unknown tool error
       }
     }
 

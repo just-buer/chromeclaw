@@ -38,7 +38,8 @@ type LogCategory =
   | 'channel-sw'
   | 'slash-cmd'
   | 'web-auth'
-  | 'web-llm';
+  | 'web-llm'
+  | 'page-bridge';
 
 // ── Log Entry ───────────────────────────────────
 

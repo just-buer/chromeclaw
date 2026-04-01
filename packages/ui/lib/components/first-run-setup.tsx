@@ -1,5 +1,4 @@
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -15,7 +14,7 @@ import {
   SelectValue,
 } from './ui';
 import { useT } from '@extension/i18n';
-import { toolRegistryMeta, parseSkillFrontmatter, WEB_PROVIDER_OPTIONS, useWebProviderAuth } from '@extension/shared';
+import { toolRegistryMeta, parseSkillFrontmatter } from '@extension/shared';
 import {
   customModelsStorage,
   toolConfigStorage,
@@ -30,13 +29,10 @@ import {
   listWorkspaceFiles,
 } from '@extension/storage';
 import {
-  CheckCircleIcon,
   CheckIcon,
   ChevronLeftIcon,
   KeyIcon,
   Loader2Icon,
-  LogInIcon,
-  LogOutIcon,
   RocketIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -56,7 +52,6 @@ import {
   HardDriveDownloadIcon,
   MailIcon,
   CalendarIcon,
-  XCircleIcon,
   ZapIcon,
 } from 'lucide-react';
 import { IS_FIREFOX } from '@extension/env';
@@ -69,29 +64,10 @@ type FirstRunSetupProps = {
   onComplete: () => void;
 };
 
-const providers = [
-  { value: 'web', label: 'Web (Browser Session Zero Token)', defaultModel: '', defaultBase: '' },
-  { value: 'openai', label: 'OpenAI', defaultModel: 'gpt-4o', defaultBase: '' },
-  {
-    value: 'anthropic',
-    label: 'Anthropic',
-    defaultModel: 'claude-sonnet-4-5',
-    defaultBase: '',
-  },
-  { value: 'google', label: 'Google', defaultModel: 'gemini-2.0-flash', defaultBase: '' },
-  {
-    value: 'openrouter',
-    label: 'OpenRouter',
-    defaultModel: 'openai/gpt-4o',
-    defaultBase: 'https://openrouter.ai/api/v1',
-  },
-  { value: 'custom', label: 'OpenAI Compatible', defaultModel: '', defaultBase: '' },
-];
-
-const TOTAL_STEPS = IS_FIREFOX ? 6 : 5;
+const TOTAL_STEPS = IS_FIREFOX ? 5 : 4;
 const STEP_LABELS = IS_FIREFOX
-  ? (['firstRun_stepModel', 'firstRun_stepPermissions', 'firstRun_stepAgent', 'firstRun_stepChannels', 'firstRun_stepTools', 'firstRun_stepSkills'] as const)
-  : (['firstRun_stepModel', 'firstRun_stepAgent', 'firstRun_stepChannels', 'firstRun_stepTools', 'firstRun_stepSkills'] as const);
+  ? (['firstRun_stepModel', 'firstRun_stepPermissions', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const)
+  : (['firstRun_stepModel', 'firstRun_stepAgent', 'firstRun_stepTools', 'firstRun_stepSkills'] as const);
 
 /** Groups to exclude from the onboarding tool picker (require OAuth or feature flags). */
 const EXCLUDED_TOOL_GROUPS = new Set(['gmail', 'calendar', 'drive']);
@@ -172,7 +148,6 @@ const StepIndicator = ({ current, t }: { current: number; t: TFunction }) => (
 /* ---------- Step 1: Model Setup ---------- */
 
 const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) => {
-  const [provider, setProvider] = useState('web');
   const [apiKey, setApiKey] = useState('');
   const [modelId, setModelId] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -180,52 +155,13 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
   const [error, setError] = useState('');
   const [supportsTools, setSupportsTools] = useState(true);
   const [supportsReasoning, setSupportsReasoning] = useState(true);
-  const [webProviderId, setWebProviderId] = useState('gemini-web');
-
-  const {
-    status: webAuthStatus,
-    loginLoading: webLoginLoading,
-    error: webAuthError,
-    login: handleWebLogin,
-    logout: handleWebLogout,
-  } = useWebProviderAuth({ provider, webProviderId });
-
-  // Relay web auth errors to the existing error state
-  useEffect(() => {
-    if (webAuthError) setError(webAuthError);
-  }, [webAuthError]);
-
-  const handleProviderChange = useCallback((value: string) => {
-    setProvider(value);
-    const p = providers.find(p => p.value === value);
-    if (p) {
-      setModelId(p.defaultModel);
-      setBaseUrl(p.defaultBase);
-    }
-    // Auto-set default web provider when switching to web
-    if (value === 'web' && !webProviderId) {
-      setWebProviderId('gemini-web');
-      const wp = WEB_PROVIDER_OPTIONS.find(w => w.value === 'gemini-web');
-      if (wp) setModelId(wp.defaultModelId);
-    }
-    setError('');
-  }, [webProviderId]);
 
   const handleNext = useCallback(async () => {
-    const isWeb = provider === 'web';
-    if (!isWeb && !apiKey.trim() && !baseUrl.trim()) {
+    if (!apiKey.trim() && !baseUrl.trim()) {
       setError(t('firstRun_apiKeyRequired'));
       return;
     }
-    if (isWeb && !webProviderId) {
-      setError(t('firstRun_webProviderRequired'));
-      return;
-    }
-    if (isWeb && webAuthStatus !== 'logged-in') {
-      setError(t('firstRun_webLoginRequired'));
-      return;
-    }
-    if (!isWeb && !modelId.trim()) {
+    if (!modelId.trim()) {
       setError(t('firstRun_modelIdRequired'));
       return;
     }
@@ -234,25 +170,17 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
     setError('');
 
     try {
-      const p = providers.find(p => p.value === provider);
-      const wpMatch = WEB_PROVIDER_OPTIONS.find(w => w.value === webProviderId);
-      const resolvedModelId = modelId || (isWeb ? wpMatch?.defaultModelId : undefined) || '';
-      const defaultName = isWeb ? wpMatch?.defaultModelName : undefined;
-      const resolvedName = p?.label
-        ? `${p.label} ${resolvedModelId || defaultName || ''}`.trim()
-        : resolvedModelId || defaultName || '';
       await customModelsStorage.set([
         {
           id: nanoid(),
-          modelId: resolvedModelId,
-          name: resolvedName,
-          provider,
+          modelId,
+          name: modelId,
+          provider: 'custom',
           routingMode: 'direct',
           apiKey: apiKey || undefined,
           baseUrl: baseUrl || undefined,
           supportsTools,
           supportsReasoning,
-          ...(isWeb ? { webProviderId } : {}),
         },
       ]);
       onNext();
@@ -261,18 +189,7 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
     } finally {
       setSaving(false);
     }
-  }, [
-    apiKey,
-    modelId,
-    provider,
-    baseUrl,
-    supportsTools,
-    supportsReasoning,
-    webProviderId,
-    webAuthStatus,
-    onNext,
-    t,
-  ]);
+  }, [apiKey, modelId, baseUrl, supportsTools, supportsReasoning, onNext, t]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -300,143 +217,46 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
         )}
 
         <div className="grid gap-2">
-          <Label htmlFor="setup-provider">{t('firstRun_provider')}</Label>
-          <Select onValueChange={handleProviderChange} value={provider}>
-            <SelectTrigger id="setup-provider">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {providers.map(p => (
-                <SelectItem key={p.value} value={p.value}>
-                  {p.value === 'web'
-                    ? t('provider_web')
-                    : p.value === 'custom'
-                      ? t('provider_openaiCompatible')
-                      : p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {provider === 'web' ? (
-          <div className="grid gap-2">
-            <Label htmlFor="setup-web-provider">
-              {t('firstRun_webProvider')}
-              <span className="text-muted-foreground ml-1 font-normal">{t('firstRun_webProviderHint')}</span>
-            </Label>
-            <Select
-              onValueChange={v => {
-                setWebProviderId(v);
-                const wp = WEB_PROVIDER_OPTIONS.find(w => w.value === v);
-                if (wp) setModelId(wp.defaultModelId);
+          <Label htmlFor="setup-apikey">
+            {baseUrl ? t('firstRun_apiKeyOptional') : t('firstRun_apiKey')}
+          </Label>
+          <div className="relative">
+            <KeyIcon className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+            <Input
+              className="pl-9"
+              data-testid="setup-api-key"
+              id="setup-apikey"
+              onChange={e => {
+                setApiKey(e.target.value);
                 setError('');
               }}
-              value={webProviderId}>
-              <SelectTrigger id="setup-web-provider">
-                <SelectValue placeholder={t('firstRun_selectWebProvider')} />
-              </SelectTrigger>
-              <SelectContent>
-                {WEB_PROVIDER_OPTIONS.map(wp => (
-                  <SelectItem key={wp.value} value={wp.value}>
-                    {wp.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2">
-              {webAuthStatus === 'checking' && (
-                <Badge variant="outline" className="gap-1">
-                  <Loader2Icon className="size-3 animate-spin" />
-                  {t('firstRun_webChecking')}
-                </Badge>
-              )}
-              {webAuthStatus === 'logged-in' && (
-                <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
-                  <CheckCircleIcon className="size-3" />
-                  {t('firstRun_webLoggedIn')}
-                </Badge>
-              )}
-              {(webAuthStatus === 'not-logged-in' || webAuthStatus === 'unknown') && (
-                <Badge variant="outline" className="gap-1 border-orange-500 text-orange-600">
-                  <XCircleIcon className="size-3" />
-                  {t('firstRun_webNotLoggedIn')}
-                </Badge>
-              )}
-              {webAuthStatus === 'logged-in' ? (
-                <Button onClick={handleWebLogout} size="sm" variant="outline">
-                  <LogOutIcon className="mr-1 size-3" />
-                  {t('firstRun_webLogout')}
-                </Button>
-              ) : (
-                <Button
-                  disabled={webLoginLoading || !webProviderId}
-                  onClick={handleWebLogin}
-                  size="sm"
-                  variant="outline">
-                  {webLoginLoading ? (
-                    <Loader2Icon className="mr-1 size-3 animate-spin" />
-                  ) : (
-                    <LogInIcon className="mr-1 size-3" />
-                  )}
-                  {webLoginLoading ? t('firstRun_webWaiting') : t('firstRun_webLogin')}
-                </Button>
-              )}
-            </div>
-            {webLoginLoading && (
-              <p className="text-muted-foreground text-xs">
-                {t('firstRun_webLoginInstruction')}
-              </p>
-            )}
+              onKeyDown={handleKeyDown}
+              placeholder="sk-..."
+              type="password"
+              value={apiKey}
+            />
           </div>
-        ) : (
-          <>
-            <div className="grid gap-2">
-              <Label htmlFor="setup-apikey">
-                {baseUrl ? t('firstRun_apiKeyOptional') : t('firstRun_apiKey')}
-              </Label>
-              <div className="relative">
-                <KeyIcon className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-                <Input
-                  className="pl-9"
-                  data-testid="setup-api-key"
-                  id="setup-apikey"
-                  onChange={e => {
-                    setApiKey(e.target.value);
-                    setError('');
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="sk-..."
-                  type="password"
-                  value={apiKey}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="setup-baseurl">{t('firstRun_baseUrl')}</Label>
-              <Input
-                data-testid="setup-base-url"
-                id="setup-baseurl"
-                onChange={e => {
-                  setBaseUrl(e.target.value);
-                  setError('');
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="https://api.example.com/v1"
-                type="url"
-                value={baseUrl}
-              />
-              <p className="text-muted-foreground text-xs">{t('firstRun_baseUrlHint')}</p>
-            </div>
-          </>
-        )}
+        </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="setup-model">
-            {t('firstRun_modelId')}
-            {provider === 'web' && <span className="text-muted-foreground ml-1 font-normal">{t('firstRun_optional')}</span>}
-          </Label>
+          <Label htmlFor="setup-baseurl">{t('firstRun_baseUrl')}</Label>
+          <Input
+            data-testid="setup-base-url"
+            id="setup-baseurl"
+            onChange={e => {
+              setBaseUrl(e.target.value);
+              setError('');
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="https://api.example.com/v1"
+            type="url"
+            value={baseUrl}
+          />
+          <p className="text-muted-foreground text-xs">{t('firstRun_baseUrlHint')}</p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="setup-model">{t('firstRun_modelId')}</Label>
           <Input
             data-testid="setup-model-id"
             id="setup-model"
@@ -445,18 +265,9 @@ const Step1ModelSetup = ({ onNext, t }: { onNext: () => void; t: TFunction }) =>
               setError('');
             }}
             onKeyDown={handleKeyDown}
-            placeholder={
-              provider === 'web'
-                ? WEB_PROVIDER_OPTIONS.find(w => w.value === webProviderId)?.defaultModelId ?? t('firstRun_autoDetected')
-                : 'gpt-4o'
-            }
+            placeholder="gpt-4o"
             value={modelId}
           />
-          {provider === 'web' && (
-            <p className="text-muted-foreground text-xs">
-              {t('firstRun_autoDetectedHint')}
-            </p>
-          )}
         </div>
 
         <div className="flex gap-4">
@@ -1226,13 +1037,13 @@ const FirstRunSetup = ({ onComplete }: FirstRunSetupProps) => {
           {step === 2 + offset && (
             <Step3AgentSetup onBack={() => setStep(1 + offset)} onNext={() => setStep(3 + offset)} t={t} />
           )}
-          {step === 3 + offset && (
+          {/* {step === 3 + offset && (
             <Step2ChannelSetup onBack={() => setStep(2 + offset)} onNext={() => setStep(4 + offset)} t={t} />
+          )} */}
+          {step === 3 + offset && (
+            <Step4ToolsSetup onBack={() => setStep(2 + offset)} onNext={() => setStep(4 + offset)} t={t} />
           )}
-          {step === 4 + offset && (
-            <Step4ToolsSetup onBack={() => setStep(3 + offset)} onNext={() => setStep(5 + offset)} t={t} />
-          )}
-          {step === 5 + offset && <Step5SkillsSetup onBack={() => setStep(4 + offset)} onComplete={onComplete} t={t} />}
+          {step === 4 + offset && <Step5SkillsSetup onBack={() => setStep(3 + offset)} onComplete={onComplete} t={t} />}
         </div>
 
         <div className="flex items-center justify-between px-6 pb-6 pt-2">

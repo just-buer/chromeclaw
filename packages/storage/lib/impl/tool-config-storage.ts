@@ -24,6 +24,8 @@ interface ToolConfig {
   deepResearchConfig?: DeepResearchConfig;
   /** User-provided Google OAuth client ID. When set, tools use launchWebAuthFlow instead of getAuthToken. */
   googleClientId?: string;
+  /** Enable auto-discovery of page-registered tools via window.__ulcopilot */
+  pageBridgeEnabled?: boolean;
 }
 
 const defaultWebSearchConfig: WebSearchProviderConfig = {
@@ -202,6 +204,7 @@ const toolConfigStorage = {
       webSearchConfig,
       deepResearchConfig,
       ...(stored.googleClientId ? { googleClientId: stored.googleClientId } : {}),
+      ...(stored.pageBridgeEnabled != null ? { pageBridgeEnabled: stored.pageBridgeEnabled } : {}),
     };
 
     // Persist migration if legacy fields were found
