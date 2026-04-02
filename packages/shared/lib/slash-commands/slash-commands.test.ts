@@ -72,7 +72,7 @@ describe('getSlashCommands', () => {
     expect(names).toContain('compact');
     expect(names).toContain('copy');
     expect(names).toContain('export');
-    expect(cmds.length).toBe(4);
+    expect(cmds.length).toBe(5);
   });
 
   it('each command has a name and description', () => {
