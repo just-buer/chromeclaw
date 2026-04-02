@@ -119,7 +119,7 @@ const handleLLMStream = async (
   port: chrome.runtime.Port,
   request: LLMRequestMessage,
 ): Promise<void> => {
-  const { chatId, messages, model: modelConfig, assistantMessageId } = request;
+  const { chatId, messages, model: modelConfig, assistantMessageId, thinkingLevel } = request;
   const assistantParts: ChatMessagePart[] = [];
 
   // Pending approval promises keyed by toolCallId, also carries the matched rule for context
@@ -194,6 +194,7 @@ const handleLLMStream = async (
     modelId: modelConfig.id,
     provider: modelConfig.provider,
     messageCount: messages.length,
+    ...(thinkingLevel ? { thinkingLevel } : {}),
   });
 
   try {
@@ -278,6 +279,7 @@ const handleLLMStream = async (
       convertToLlm: makeConvertToLlm(modelConfig),
       transformContext: notifyingTransformContext,
       chatId,
+      thinkingLevel,
       onProviderLimitDetected: setProviderLimit,
       onApprovalRequest,
       onShouldApprove,

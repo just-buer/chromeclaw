@@ -64,10 +64,36 @@ const qwenWeb: WebProviderDefinition = {
               timestamp: Math.floor(Date.now() / 1000),
               models: [model],
               chat_type: 't2t',
-              feature_config: {
-                thinking_enabled: true,
-                output_schema: 'phase',
-              },
+              feature_config:
+                opts.thinkingLevel === 'fast'
+                  ? {
+                      thinking_enabled: false,
+                      output_schema: 'phase',
+                      research_mode: 'normal',
+                      auto_thinking: false,
+                      thinking_mode: 'Fast',
+                      auto_search: true,
+                    }
+                  : opts.thinkingLevel === 'thinking'
+                    ? {
+                        thinking_enabled: true,
+                        output_schema: 'phase',
+                        research_mode: 'normal',
+                        auto_thinking: false,
+                        thinking_mode: 'Thinking',
+                        thinking_format: 'summary',
+                        auto_search: true,
+                      }
+                    : {
+                        // Default: Auto mode — Qwen decides whether to think
+                        thinking_enabled: true,
+                        output_schema: 'phase',
+                        research_mode: 'normal',
+                        auto_thinking: true,
+                        thinking_mode: 'Auto',
+                        thinking_format: 'summary',
+                        auto_search: true,
+                      },
             },
           ],
         }),

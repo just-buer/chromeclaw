@@ -5,11 +5,15 @@
  */
 
 import { createClaudeStreamAdapter } from './providers/claude-web-stream-adapter';
+import { createChatGPTStreamAdapter } from './providers/chatgpt-stream-adapter';
+import { createDeepSeekStreamAdapter } from './providers/deepseek-stream-adapter';
+import { createDoubaoStreamAdapter } from './providers/doubao-stream-adapter';
 import { createGeminiStreamAdapter } from './providers/gemini-web-stream-adapter';
 import { createGlmIntlStreamAdapter } from './providers/glm-intl-stream-adapter';
 import { createGlmStreamAdapter } from './providers/glm-stream-adapter';
 import { createKimiStreamAdapter } from './providers/kimi-web-stream-adapter';
 import { createQwenStreamAdapter } from './providers/qwen-stream-adapter';
+import { createRakutenStreamAdapter } from './providers/rakuten-stream-adapter';
 import type { WebProviderId } from './types';
 
 interface SseStreamAdapter {
@@ -61,13 +65,18 @@ const createDefaultAdapter = (): SseStreamAdapter => ({
   shouldAbort: () => false,
 });
 
-const getSseStreamAdapter = (providerId: WebProviderId, opts?: {
-  /** Tool names excluded from the prompt — Qwen adapter skips native interception for these. */
-  excludeTools?: ReadonlySet<string>;
-}): SseStreamAdapter => {
+const getSseStreamAdapter = (
+  providerId: WebProviderId,
+  opts?: {
+    /** Tool names excluded from the prompt — Qwen adapter skips native interception for these. */
+    excludeTools?: ReadonlySet<string>;
+  },
+): SseStreamAdapter => {
   switch (providerId) {
     case 'claude-web':
       return createClaudeStreamAdapter();
+    case 'chatgpt-web':
+      return createChatGPTStreamAdapter();
     case 'qwen-web':
     case 'qwen-cn-web':
       return createQwenStreamAdapter({ skipNativeTools: opts?.excludeTools });
@@ -77,8 +86,14 @@ const getSseStreamAdapter = (providerId: WebProviderId, opts?: {
       return createGlmStreamAdapter();
     case 'glm-intl-web':
       return createGlmIntlStreamAdapter();
+    case 'deepseek-web':
+      return createDeepSeekStreamAdapter();
+    case 'doubao-web':
+      return createDoubaoStreamAdapter();
     case 'gemini-web':
       return createGeminiStreamAdapter();
+    case 'rakuten-web':
+      return createRakutenStreamAdapter();
     default:
       return createDefaultAdapter();
   }

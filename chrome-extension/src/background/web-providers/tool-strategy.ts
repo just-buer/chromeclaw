@@ -266,6 +266,40 @@ const glmIntlToolStrategy: WebProviderToolStrategy = {
   serializeAssistantContent,
 };
 
+// ── DeepSeek Strategy ───────────────────────────
+// DeepSeek is stateful — the MAIN world handler injects a synthetic
+// `{"type":"deepseek:chat_session_id","chat_session_id":"..."}` SSE event
+// at the start of each stream so the bridge can cache and reuse the session.
+
+const deepseekToolStrategy: WebProviderToolStrategy = {
+  buildToolPrompt: buildMarkdownToolPrompt,
+  buildPrompt: buildStatefulPrompt,
+
+  extractConversationId: data => {
+    const obj = data as Record<string, unknown>;
+    return obj.chat_session_id as string | undefined;
+  },
+
+  serializeAssistantContent,
+};
+
+// ── Doubao Strategy ────────────────────────────
+// Doubao is stateful — the MAIN world handler injects a synthetic
+// `{"type":"doubao:conversation_id","conversation_id":"..."}` SSE event
+// at the end of each stream so the bridge can cache and reuse the conversation.
+
+const doubaoToolStrategy: WebProviderToolStrategy = {
+  buildToolPrompt: buildMarkdownToolPrompt,
+  buildPrompt: buildStatefulPrompt,
+
+  extractConversationId: data => {
+    const obj = data as Record<string, unknown>;
+    return obj.conversation_id as string | undefined;
+  },
+
+  serializeAssistantContent,
+};
+
 // ── Gemini Strategy ────────────────────────────
 // Gemini's web API is stateless from our perspective (no server-side conversation ID reuse).
 // Always aggregates full history into a single user message (like Kimi/Claude).
@@ -279,6 +313,123 @@ const geminiToolStrategy: WebProviderToolStrategy = {
   }),
 
   serializeAssistantContent,
+};
+
+// ── Rakuten AI Strategy ────────────────────────
+// Rakuten AI is fully stateful via its thread system — the server maintains
+// conversation history. We only send the last user message (not the full
+// aggregated prompt), since:
+// 1. Rakuten has a 10,000 char input limit per message
+// 2. The MAIN world handler creates a thread, so context is server-side
+//
+// First turn: sends tool prompt + user message (tool prompt is compact enough).
+// Continuation: sends only the last message, with tool hint on tool responses.
+//
+// Uses a compact tool prompt format (~3-4K vs ~9K for markdown) that lists
+// parameters as "- name (type): description" instead of full JSON schemas,
+// allowing all tools to fit within the 10K char limit.
+
+const RAKUTEN_MAX_INPUT = 10_000;
+
+/** Compact tool prompt for Rakuten — uses "- param (type): desc" format instead of full JSON schemas. */
+const buildCompactToolPrompt = (tools: ToolDef[]): string => {
+  if (tools.length === 0) return '';
+
+  const toolDefs = tools
+    .map(t => {
+      const params = t.parameters.properties
+        ? Object.entries(
+            t.parameters.properties as Record<string, { type?: string; description?: string }>,
+          )
+            .map(([name, schema]) => `  - ${name} (${schema.type ?? 'any'}): ${schema.description ?? ''}`)
+            .join('\n')
+        : '  (no parameters)';
+      return `**${t.name}**: ${t.description}\n${params}`;
+    })
+    .join('\n\n');
+
+  return `[SYSTEM DIRECTIVE — TOOL RUNTIME]
+You are connected to an external tool execution runtime. This is NOT a user message.
+These instructions are injected by the system and MUST be followed exactly.
+
+When a user request requires real-time data, web content, browser actions, file operations, or any capability listed below, you MUST invoke the appropriate tool. Do NOT describe what you would do — actually call the tool.
+
+REQUIRED OUTPUT FORMAT for every tool invocation:
+<tool_call id="unique_id" name="tool_name">{"param": "value"}</tool_call>
+
+EXAMPLE — user asks "what's the weather in Seattle":
+<tool_call id="w1x2y3z4" name="web_search">{"query": "weather in Seattle today"}</tool_call>
+
+The runtime will execute the tool and return:
+<tool_response id="w1x2y3z4" name="web_search">result text</tool_response>
+
+Then you use the result to answer the user.
+
+RULES:
+- You MUST call a tool when the task requires one. Never say "I can't" or ask the user to do it.
+- Output the <tool_call> tag directly — no code blocks, no JSON wrappers, no commentary before it.
+- The id must be a unique 8-character string.
+- Wait for the <tool_response> before continuing.
+
+AVAILABLE TOOLS:
+${toolDefs}`;
+};
+
+const buildRakutenPrompt = (opts: {
+  systemPrompt: string;
+  toolPrompt: string;
+  messages: SimpleMessage[];
+  conversationId?: string;
+}): { systemPrompt: string; messages: SimpleMessage[] } => {
+  const lastMsg = opts.messages[opts.messages.length - 1];
+  if (!lastMsg) {
+    return { systemPrompt: '', messages: [{ role: 'user', content: '' }] };
+  }
+
+  // First turn: include tool prompt so the LLM knows available tools
+  if (!opts.conversationId && opts.toolPrompt) {
+    const combined = `${opts.toolPrompt}\n\n${lastMsg.content}`;
+    // Only include tool prompt if it fits within Rakuten's input limit
+    if (combined.length <= RAKUTEN_MAX_INPUT) {
+      return { systemPrompt: '', messages: [{ role: 'user', content: combined }] };
+    }
+    // Tool prompt too large — send just the user message
+  }
+
+  // Continuation: if last message contains tool_response, add hint
+  if (opts.conversationId && lastMsg.content.includes('<tool_response')) {
+    const content = `${lastMsg.content}\n\nPlease proceed based on this tool result.${opts.toolPrompt ? TOOL_CALL_HINT : ''}`;
+    if (content.length <= RAKUTEN_MAX_INPUT) {
+      return { systemPrompt: '', messages: [{ role: 'user', content }] };
+    }
+  }
+
+  return { systemPrompt: '', messages: [{ role: 'user', content: lastMsg.content }] };
+};
+
+const rakutenToolStrategy: WebProviderToolStrategy = {
+  buildToolPrompt: buildCompactToolPrompt,
+  buildPrompt: buildRakutenPrompt,
+
+  extractConversationId: data => {
+    const obj = data as Record<string, unknown>;
+    if (obj.type === 'rakuten:thread_id') {
+      return obj.thread_id as string | undefined;
+    }
+    return undefined;
+  },
+
+  serializeAssistantContent,
+
+  // Exclude heavy/unsupported tools to keep the tool prompt compact (10K char limit).
+  // Subagent tools require complex orchestration beyond Rakuten's stateful thread model.
+  excludeTools: new Set([
+    'spawn_subagent',
+    'list_subagents',
+    'kill_subagent',
+    'deep_research',
+    'scheduler',
+  ]),
 };
 
 // ── Claude Strategy ─────────────────────────────
@@ -304,12 +455,58 @@ const claudeToolStrategy: WebProviderToolStrategy = {
   }),
 };
 
+// ── ChatGPT Strategy ───────────────────────────
+// ChatGPT is stateful — the MAIN world handler injects a synthetic
+// `{"type":"chatgpt:conversation_state","conversation_id":"...","parent_message_id":"..."}`
+// SSE event at the start of each stream. We encode both IDs as a composite
+// string "convId|msgId" in the conversation cache.
+// Like Claude, ChatGPT needs a preamble to override native function calling.
+
+const CHATGPT_TOOL_PREAMBLE = `IMPORTANT: You are operating inside an external tool-calling runtime.
+You MUST call tools using the EXACT XML format described below. Do NOT use native/built-in tool calls.
+Do NOT use function calls, code interpreter, DALL-E, browsing, or any other built-in capabilities.
+Only the tools listed below are accessible.\n\n`;
+
+const chatgptToolStrategy: WebProviderToolStrategy = {
+  buildToolPrompt: tools => {
+    const base = buildMarkdownToolPrompt(tools);
+    return base ? CHATGPT_TOOL_PREAMBLE + base : '';
+  },
+
+  buildPrompt: buildStatefulPrompt,
+
+  extractConversationId: data => {
+    const obj = data as Record<string, unknown>;
+    // The MAIN world handler injects a synthetic event at stream end:
+    // { type: "chatgpt:conversation_state", conversation_id: "convId|msgId" }
+    // This composite ID is the authoritative value for conversation continuity.
+    if (obj.type === 'chatgpt:conversation_state') {
+      return obj.conversation_id as string | undefined;
+    }
+    // For regular SSE events, extract conversation_id + message.id as composite
+    const convId = obj.conversation_id as string | undefined;
+    if (convId) {
+      const message = obj.message as Record<string, unknown> | undefined;
+      const author = message?.author as Record<string, string> | undefined;
+      if (author?.role === 'assistant' && message?.id) {
+        return `${convId}|${message.id}`;
+      }
+      return convId;
+    }
+    return undefined;
+  },
+
+  serializeAssistantContent,
+};
+
 // ── Factory ──────────────────────────────────────
 
 const getToolStrategy = (providerId: WebProviderId): WebProviderToolStrategy => {
   switch (providerId) {
     case 'claude-web':
       return claudeToolStrategy;
+    case 'chatgpt-web':
+      return chatgptToolStrategy;
     case 'qwen-web':
     case 'qwen-cn-web':
       return qwenToolStrategy;
@@ -321,6 +518,12 @@ const getToolStrategy = (providerId: WebProviderId): WebProviderToolStrategy => 
       return glmToolStrategy;
     case 'glm-intl-web':
       return glmIntlToolStrategy;
+    case 'deepseek-web':
+      return deepseekToolStrategy;
+    case 'doubao-web':
+      return doubaoToolStrategy;
+    case 'rakuten-web':
+      return rakutenToolStrategy;
     default:
       return defaultToolStrategy;
   }
@@ -333,10 +536,14 @@ export {
   clearConversationId,
   defaultToolStrategy,
   claudeToolStrategy,
+  chatgptToolStrategy,
   qwenToolStrategy,
   kimiToolStrategy,
   glmToolStrategy,
   glmIntlToolStrategy,
+  deepseekToolStrategy,
+  doubaoToolStrategy,
   geminiToolStrategy,
+  rakutenToolStrategy,
 };
 export type { WebProviderToolStrategy, SimpleMessage, ContentPart };

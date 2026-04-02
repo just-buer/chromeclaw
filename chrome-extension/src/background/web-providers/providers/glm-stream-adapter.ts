@@ -28,6 +28,7 @@ const GLM_TOOL_CALL_CLOSE_STD = '</tool_call>';
 const createGlmStreamAdapter = (): SseStreamAdapter => {
   let prevText = '';
   let prevThink = '';
+  let prevLogicId = '';
   let thinkStarted = false;
 
   return {
@@ -42,9 +43,17 @@ const createGlmStreamAdapter = (): SseStreamAdapter => {
       }
 
       const parts = obj.parts as
-        | Array<{ content?: Array<{ type?: string; text?: string; think?: string }> }>
+        | Array<{ logic_id?: string; content?: Array<{ type?: string; text?: string; think?: string }> }>
         | undefined;
       if (!parts || parts.length === 0) return null;
+
+      // Reset cumulative counters when phase changes (logic_id changes)
+      const logicId = parts[0]?.logic_id;
+      if (logicId && logicId !== prevLogicId) {
+        prevLogicId = logicId;
+        prevText = '';
+        prevThink = '';
+      }
 
       const content = parts[0]?.content?.[0];
       if (!content) return null;
@@ -62,6 +71,15 @@ const createGlmStreamAdapter = (): SseStreamAdapter => {
           return { feedText: `<think>${thinkDelta}` };
         }
         return { feedText: thinkDelta };
+      }
+
+      // Handle tool_calls content (e.g. "finish" signal between think→text phases)
+      if (content.type === 'tool_calls') {
+        if (thinkStarted) {
+          thinkStarted = false;
+          return { feedText: '</think>' };
+        }
+        return null;
       }
 
       // Handle text content (cumulative)
@@ -99,6 +117,17 @@ const createGlmStreamAdapter = (): SseStreamAdapter => {
     },
 
     shouldAbort: () => false,
+
+    onFinish({ hasToolCalls, fullText }) {
+      if (!hasToolCalls && !fullText) {
+        return {
+          error:
+            'GLM returned an empty response. This usually means your account has been rate-limited or restricted. ' +
+            'Please check your account status at chatglm.cn and try again.',
+        };
+      }
+      return null;
+    },
   };
 };
 

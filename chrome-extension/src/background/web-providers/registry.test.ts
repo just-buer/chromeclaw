@@ -5,9 +5,9 @@ import { describe, it, expect } from 'vitest';
 import { getWebProvider, getAllWebProviders } from './registry';
 
 describe('web provider registry', () => {
-  it('returns all 7 providers', () => {
+  it('returns all 11 providers', () => {
     const all = getAllWebProviders();
-    expect(all).toHaveLength(7);
+    expect(all).toHaveLength(11);
   });
 
   it('looks up claude-web provider by ID', () => {
@@ -15,6 +15,27 @@ describe('web provider registry', () => {
     expect(provider).toBeDefined();
     expect(provider!.name).toBe('Claude (Web)');
     expect(provider!.loginUrl).toBe('https://claude.ai');
+  });
+
+  it('looks up deepseek-web provider by ID', () => {
+    const provider = getWebProvider('deepseek-web');
+    expect(provider).toBeDefined();
+    expect(provider!.name).toBe('DeepSeek (Web)');
+    expect(provider!.loginUrl).toBe('https://chat.deepseek.com');
+  });
+
+  it('looks up doubao-web provider by ID', () => {
+    const provider = getWebProvider('doubao-web');
+    expect(provider).toBeDefined();
+    expect(provider!.name).toBe('Doubao (Web)');
+    expect(provider!.loginUrl).toBe('https://www.doubao.com/chat/');
+  });
+
+  it('looks up rakuten-web provider by ID', () => {
+    const provider = getWebProvider('rakuten-web');
+    expect(provider).toBeDefined();
+    expect(provider!.name).toBe('Rakuten AI (Web)');
+    expect(provider!.loginUrl).toBe('https://ai.rakuten.co.jp');
   });
 
   it('returns undefined for unknown provider ID', () => {

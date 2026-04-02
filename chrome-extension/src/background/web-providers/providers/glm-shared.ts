@@ -99,7 +99,7 @@ const buildGlmRequestConfig = (opts: WebRequestOpts, config: GlmProviderConfig) 
           input_question_type: 'xxxx',
           channel: '',
           draft_id: '',
-          chat_mode: 'zero',
+          chat_mode: opts.thinkingLevel === 'thinking' ? 'zero' : '',
           is_networking: false,
           quote_log_id: '',
           platform: 'pc',

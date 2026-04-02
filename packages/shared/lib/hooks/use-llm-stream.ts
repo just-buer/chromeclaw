@@ -6,6 +6,7 @@ import type {
   ChatMessagePart,
   ChatModel,
   SessionUsage,
+  ThinkingLevel,
   StreamingStatus,
   LLMStreamChunk,
   LLMStreamEnd,
@@ -18,6 +19,7 @@ interface UseLLMStreamOptions {
   chatId: string;
   initialMessages?: ChatMessage[];
   model: ChatModel;
+  thinkingLevel?: ThinkingLevel;
   onStreamComplete?: (assistantMessage: ChatMessage, usage?: SessionUsage) => Promise<void> | void;
   onChatCreated?: (chatId: string, firstUserMessage: string) => void;
   onUserMessageCreated?: (userMessage: ChatMessage) => void;
@@ -44,6 +46,7 @@ const useLLMStream = ({
   chatId,
   initialMessages = [],
   model,
+  thinkingLevel,
   onStreamComplete,
   onChatCreated,
   onUserMessageCreated,
@@ -155,6 +158,13 @@ const useLLMStream = ({
 
   const handleEnd = useCallback(
     async (end: LLMStreamEnd) => {
+      // Show timeout notice so the user knows the response was cut short
+      if (end.finishReason === 'timeout') {
+        updateAssistantPart(parts => [
+          ...parts,
+          { type: 'text' as const, text: '\n\n⚠️ Agent timed out — response may be incomplete.' },
+        ]);
+      }
       setStatus('idle');
       portRef.current?.disconnect();
       portRef.current = null;
@@ -173,7 +183,7 @@ const useLLMStream = ({
         await onStreamComplete?.(assistantMessageRef.current, usage);
       }
     },
-    [onStreamComplete],
+    [onStreamComplete, updateAssistantPart],
   );
 
   const handleError = useCallback(
@@ -325,6 +335,7 @@ const useLLMStream = ({
           messages: messagesToSend,
           model,
           assistantMessageId: assistantMessage.id,
+          ...(thinkingLevel ? { thinkingLevel } : {}),
         });
 
         return newMessages;
@@ -335,6 +346,7 @@ const useLLMStream = ({
     [
       chatId,
       model,
+      thinkingLevel,
       status,
       handleChunk,
       handleEnd,

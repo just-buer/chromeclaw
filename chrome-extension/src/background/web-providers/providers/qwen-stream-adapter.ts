@@ -16,7 +16,12 @@ interface ChoiceDelta {
   function_call?: { name: string; arguments: string };
   function_id?: string;
   name?: string;
+  extra?: Record<string, { content?: string[] }>;
 }
+
+/** Qwen uses `thinking_summary` for its thinking phase; DeepSeek uses `think`. */
+const isThinkPhase = (phase: string | undefined): boolean =>
+  phase === 'think' || phase === 'thinking_summary';
 
 /** Extract the first choice delta from a parsed SSE payload. */
 const getChoiceDelta = (parsed: unknown): ChoiceDelta | undefined => {
@@ -77,8 +82,8 @@ const createQwenStreamAdapter = (opts?: {
   /** Build prefix string for a phase transition. */
   const phasePrefix = (fromPhase: string | undefined, toPhase: string | undefined): string => {
     let prefix = '';
-    if (fromPhase === 'think') prefix += '</think>';
-    if (toPhase === 'think') prefix += '<think>';
+    if (isThinkPhase(fromPhase)) prefix += '</think>';
+    if (isThinkPhase(toPhase)) prefix += '<think>';
     return prefix;
   };
 
@@ -153,7 +158,7 @@ const createQwenStreamAdapter = (opts?: {
           }
 
           let prefix = '';
-          if (currentPhase === 'think') {
+          if (isThinkPhase(currentPhase)) {
             prefix = '</think>';
             currentPhase = 'answer';
           }
@@ -168,6 +173,20 @@ const createQwenStreamAdapter = (opts?: {
         return null;
       }
 
+      // --- Thinking content from extra.summary_thought (Qwen thinking_summary phase) ---
+      if (isThinkPhase(phase) && choiceDelta?.extra) {
+        const thoughts = choiceDelta.extra.summary_thought?.content;
+        if (thoughts && thoughts.length > 0) {
+          const text = thoughts.join('\n');
+          let feedText = text;
+          if (phase !== currentPhase) {
+            feedText = phasePrefix(currentPhase, phase) + text;
+          }
+          currentPhase = phase;
+          return { feedText };
+        }
+      }
+
       // --- Regular delta with phase tracking ---
       if (delta) {
         let feedText = delta;
@@ -180,7 +199,7 @@ const createQwenStreamAdapter = (opts?: {
 
       // --- Empty delta but phase changed ---
       if (phase && phase !== currentPhase) {
-        const prefix = phasePrefix(currentPhase, undefined);
+        const prefix = phasePrefix(currentPhase, phase);
         currentPhase = phase;
         if (prefix) return { feedText: prefix };
       }
@@ -189,7 +208,7 @@ const createQwenStreamAdapter = (opts?: {
     },
 
     flush() {
-      if (currentPhase === 'think') {
+      if (isThinkPhase(currentPhase)) {
         currentPhase = undefined;
         return { feedText: '</think>' };
       }
@@ -222,7 +241,7 @@ const createQwenStreamAdapter = (opts?: {
       if (parts.length === 0) return null;
 
       let prefix = '';
-      if (currentPhase === 'think') {
+      if (isThinkPhase(currentPhase)) {
         prefix = '</think>';
         currentPhase = 'answer';
       }

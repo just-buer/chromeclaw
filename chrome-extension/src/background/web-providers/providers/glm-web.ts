@@ -8,10 +8,10 @@ const glmWeb: WebProviderDefinition = {
   loginUrl: 'https://chatglm.cn',
   cookieDomain: '.chatglm.cn',
   sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
-  defaultModelId: 'glm-5',
-  defaultModelName: 'GLM-5',
+  defaultModelId: 'GLM-5-Turbo',
+  defaultModelName: 'GLM-5-Turbo',
   supportsTools: true,
-  supportsReasoning: false,
+  supportsReasoning: true,
   contextWindow: 128_000,
   refreshAuth: opts => refreshGlmAuth({ ...opts, baseUrl: 'https://chatglm.cn' }),
   buildRequest: opts =>
