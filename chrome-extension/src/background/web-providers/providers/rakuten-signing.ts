@@ -11,7 +11,13 @@
  * functions are serialized, the signing must be duplicated there.
  */
 
-/** Hardcoded HMAC key from Rakuten AI JS bundle (bx() function). */
+/**
+ * Hardcoded HMAC key from Rakuten AI JS bundle (bx() function).
+ * ⚠ SYNC: This key is also hardcoded in two MAIN-world contexts that cannot import this module:
+ *   - rakuten-web.ts → refreshAuth() serialized function
+ *   - content-fetch-main.ts → handleRakuten() serialized function
+ * If the key changes, all three locations must be updated together.
+ */
 const RAKUTEN_HMAC_KEY = '4f0465bfea7761a510dda451ff86a935bf0c8ed6fb37f80441509c64328788c8';
 
 /**

@@ -37,6 +37,7 @@ const rakutenWeb: WebProviderDefinition = {
       target: { tabId },
       world: 'MAIN',
       func: async () => {
+        // ⚠ SYNC: HMAC key also in rakuten-signing.ts and content-fetch-main.ts (handleRakuten)
         const HMAC_KEY = '4f0465bfea7761a510dda451ff86a935bf0c8ed6fb37f80441509c64328788c8';
         const hmacSign = async (message: string, key: string): Promise<string> => {
           const enc = new TextEncoder();
@@ -77,7 +78,7 @@ const rakutenWeb: WebProviderDefinition = {
         let bearer = '';
         try {
           const at = localStorage.getItem('accessToken');
-          if (at && at.startsWith('@St.')) bearer = at;
+          if (at && at.length > 10) bearer = at;
         } catch {
           /* ignore */
         }
@@ -87,28 +88,11 @@ const rakutenWeb: WebProviderDefinition = {
           try {
             for (let i = 0; i < localStorage.length; i++) {
               const key = localStorage.key(i);
-              if (!key) continue;
+              if (!key || key === 'accessToken') continue;
               const val = localStorage.getItem(key);
-              if (!val) continue;
-              if (val.startsWith('@St.')) {
+              if (val && val.startsWith('@St.')) {
                 bearer = val;
                 break;
-              }
-              try {
-                const parsed = JSON.parse(val);
-                if (typeof parsed === 'string' && parsed.startsWith('@St.')) {
-                  bearer = parsed;
-                  break;
-                }
-                if (typeof parsed === 'object' && parsed !== null) {
-                  const tok = parsed.accessToken ?? parsed.token ?? parsed.access_token ?? '';
-                  if (typeof tok === 'string' && tok.startsWith('@St.')) {
-                    bearer = tok;
-                    break;
-                  }
-                }
-              } catch {
-                /* not JSON */
               }
             }
           } catch {

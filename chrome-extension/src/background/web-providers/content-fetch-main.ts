@@ -2486,6 +2486,7 @@ export const mainWorldFetch = async (request: ContentFetchRequest): Promise<void
       });
 
       // ── HMAC-SHA256 Signing (inline — cannot import modules in serialized context) ──
+      // ⚠ SYNC: HMAC key also in rakuten-signing.ts and rakuten-web.ts (refreshAuth)
       const HMAC_KEY = '4f0465bfea7761a510dda451ff86a935bf0c8ed6fb37f80441509c64328788c8';
 
       const hmacSign = async (message: string, key: string): Promise<string> => {
